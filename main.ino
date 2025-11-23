@@ -1,5 +1,3 @@
-// aqi_monitor.ino (Main Sketch File)
-
 #include <ESP8266WiFi.h>
 #include <WiFiManager.h>
 #include <Pinger.h>
@@ -45,8 +43,8 @@ const bool USE_MOCK_DATA = true;
 // ----------------------------------------------------------------------
 
 // OTA Configuration
-// Change this password before exposing your device on an untrusted network
-const char* OTA_PASSWORD = "changeme"; // <-- change before public use
+// No separate OTA password; OTA will be available on whatever network the device is connected to
+const char* OTA_PASSWORD = nullptr; // no password
 
 // --- Global Variables/Instances ---
 WiFiHandler wifiHandler;
