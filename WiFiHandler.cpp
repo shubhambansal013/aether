@@ -1,52 +1,104 @@
 // WiFiHandler.cpp
 
 #include "WiFiHandler.h"
+#include <ESP8266WiFi.h>
+
+// Helper function (defined in this translation unit, no class scope needed)
+const int MAX_SCAN_ATTEMPTS = 5; 
+
+bool isSSIDAvailable(const char* targetSsid) {
+    if (targetSsid == nullptr || targetSsid[0] == '\0') {
+        return false;
+    }
+    
+    Serial.println("Starting multiple scan attempts for saved SSID...");
+    
+    for (int attempt = 1; attempt <= MAX_SCAN_ATTEMPTS; ++attempt) {
+        Serial.print("Scan Attempt #");
+        Serial.print(attempt);
+        Serial.print("...");
+        
+        int n = WiFi.scanNetworks(); 
+        
+        if (n > 0) {
+            for (int i = 0; i < n; ++i) {
+                if (WiFi.SSID(i) == String(targetSsid)) {
+                    Serial.println("SUCCESS! SSID found.");
+                    return true;
+                }
+            }
+        }
+        
+        Serial.println("Not found. Waiting 2s.");
+        delay(2000); 
+    }
+    
+    Serial.print("FAILURE: Saved SSID [");
+    Serial.print(targetSsid);
+    Serial.println("] not found after all attempts.");
+    return false;
+}
 
 // --- Public Methods ---
 
-bool WiFiHandler::connect() {
-    // Set callbacks first
+bool WiFiHandler::connect(unsigned long quickConnectTimeoutMs, int apTimeoutSec) {
+    
+    // NOTE: This uses the static callback functions defined below
     wifiManager.setSaveConfigCallback(saveConfigCallback);
     wifiManager.setAPCallback(configModeCallback);
+    
+    const char* savedSsid = wifiManager.getWiFiSSID().c_str();
 
-    // **************************************************
-    // ** AGGRESSIVE WIFI OPTIMIZATIONS **
-    // **************************************************
+    // Path 1: Case #1 - No saved config: Go straight to AP mode.
+    if (savedSsid[0] == '\0') {
+        Serial.println("Case #1: No saved config. Starting Config AP...");
+        wifiManager.setConnectTimeout(apTimeoutSec); 
+        return wifiManager.autoConnect("airmon_AP", "password");
+    }
 
-    // Set a longer timeout (10 minutes/600 seconds) for connection attempt/config portal.
-    wifiManager.setConnectTimeout(600);
+    // Path 2 & 3 Logic
+    if (isSSIDAvailable(savedSsid)) {
+        Serial.print("Case #3: Saved SSID is available. Attempting connect...");
+        
+        WiFi.mode(WIFI_STA); 
+        WiFi.begin();
+        
+        unsigned long startTime = millis();
+        while (WiFi.status() != WL_CONNECTED && (millis() - startTime) < quickConnectTimeoutMs) {
+            delay(500);
+            Serial.print(".");
+        }
+        
+        if (WiFi.status() == WL_CONNECTED) {
+            Serial.println("\nSUCCESS! Connected with saved credentials.");
+            return true; 
+        }
 
-    // Disable captive portal feature for stability during configuration
-    // Note: The ESP8266 core usually handles this well, but disabling can help in some cases.
-    // wifiManager.setAPClientCheck(false); // Can be removed/tested if issues arise
-
-    // Force the ESP8266 to prioritize 2.4 GHz scanning (often helps stability)
-    WiFi.mode(WIFI_STA); // Set to client mode (Station)
-    // WiFi.scanDelete(); // Clearing scans can be aggressive; try without it first.
-
-    // If autoConnect fails (e.g., no saved WiFi or saved WiFi unavailable), it opens the AP.
-    // The AP name is "airmon_AP", and the password is "password".
-    // autoConnect() returns true if connected/false if it times out in the AP.
+        Serial.println("\nCase #3 Failed: Connection attempt timed out or failed.");
+    }
+    
+    // Path 3: Case #2 & Failed Case #3 - Fallback to AP Mode.
+    Serial.println("Starting Config AP fallback. User intervention required.");
+    
+    wifiManager.setConnectTimeout(apTimeoutSec); 
+    
     return wifiManager.autoConnect("airmon_AP", "password");
 }
 
-void WiFiHandler::resetSettings() {
+void WiFiHandler::resetSettings() { // <<<--- FIX: Correct Definition for ResetHandler
     Serial.println("Clearing Wi-Fi credentials via WiFiHandler.");
     wifiManager.resetSettings();
 }
 
 // --- Private Static Callback Implementations ---
 
-void WiFiHandler::saveConfigCallback () {
-    // This is called when the user successfully submits new credentials in the config portal.
+void WiFiHandler::saveConfigCallback () { // <<<--- CRITICAL FIX: Added WiFiHandler::
     Serial.println("Wi-Fi credentials saved to EEPROM.");
 }
 
-void WiFiHandler::configModeCallback (WiFiManager *myWiFiManager) {
-    // This is called when the ESP enters Configuration AP mode.
+void WiFiHandler::configModeCallback (WiFiManager *myWiFiManager) { // <<<--- CRITICAL FIX: Added WiFiHandler::
     Serial.println("Entered Configuration Mode (Connect to AP airmon_AP).");
-    // Optionally print the IP of the configuration portal
     Serial.print("Config Portal IP: ");
     Serial.println(WiFi.softAPIP());
-    // 
+    
 }
