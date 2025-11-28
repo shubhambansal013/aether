@@ -3,7 +3,7 @@ name: Robust Arduino CLI OTA Release
 on:
   push:
     tags:
-      - 'v*' # Trigger on any tag starting with 'v' (e.g., v2.1)
+      - 'v*' # Trigger on any tag starting with 'v' (e.g., v2.2)
 
 jobs:
   build_and_release:
@@ -16,6 +16,11 @@ jobs:
       - name: 📦 Setup Arduino CLI and Tools
         uses: arduino/setup-arduino-cli@v2 
 
+      # CRITICAL FIX: Enables installation from ZIP URLs for the Pinger library
+      - name: 🔐 Enable Zip/Git Library Installation
+        run: |
+          arduino-cli config set library.enable_unsafe_install true 
+          
       - name: 🔌 Install Core and Dependencies
         run: |
           echo "Installing ESP8266 core and external libraries..."
@@ -26,12 +31,11 @@ jobs:
           arduino-cli core install esp8266:esp8266
           
           # 2. Install all required external libraries
-          # Libraries found in aqi_monitor.ino and OTAHandler.cpp
           arduino-cli lib install "WiFiManager"
           arduino-cli lib install "ArduinoJson"
           arduino-cli lib install "Blynk"
 
-          # FIX for Pinger: Install Pinger library directly from GitHub ZIP URL
+          # Pinger library installed via ZIP path (now enabled by the previous step)
           PINGER_ZIP_URL="https://github.com/s00500/Pinger-Library/archive/master.zip"
           arduino-cli lib install --zip-path "$PINGER_ZIP_URL"
           
@@ -43,27 +47,23 @@ jobs:
           
           echo "Compiling sketch: $SKETCH_NAME with FQBN: $FQBN"
 
-          # Final Compile
           arduino-cli compile --fqbn $FQBN $SKETCH_NAME
           
-          # Find the compiled binary file (e.g., /tmp/.../aqi_monitor.ino.bin)
+          # Find the compiled binary file and rename it
           BUILD_DIR=$(find . -name "$SKETCH_NAME.bin" | head -1 | xargs dirname)
           if [ -z "$BUILD_DIR" ]; then 
             echo "Error: Compiled binary not found after build."
             exit 1
           fi
           
-          # Copy and rename the binary to the required asset name: firmware.bin
           cp "$BUILD_DIR/$SKETCH_NAME.bin" ./firmware.bin
           
-          # Output the tag name for the release step
           TAG_NAME=$(git describe --tags --abbrev=0)
           echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
 
       - name: 📤 Create GitHub Release and Upload Asset
         uses: softprops/action-gh-release@v2
         with:
-          # Uploads the compiled ./firmware.bin file and names the asset 'firmware.bin'
           files: ./firmware.bin:firmware.bin 
           tag_name: ${{ steps.compile.outputs.tag_name }}
           prerelease: false
