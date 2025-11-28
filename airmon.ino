@@ -38,8 +38,8 @@ const bool USE_MOCK_DATA = true;
 
 // --- OTA Update Constants ---
 // !!! IMPORTANT: Replace with your GitHub repository details !!!
-const char* GITHUB_REPO_USER = "your-github-username";
-const char* GITHUB_REPO_NAME = "your-repo-name";
+const char* GITHUB_REPO_USER = "shubhambansal013";
+const char* GITHUB_REPO_NAME = "airmon";
 const char* FIRMWARE_BIN_NAME = "firmware.bin"; // Name of the .bin file in your GitHub release assets
 // ----------------------------------------------------------------------
 
