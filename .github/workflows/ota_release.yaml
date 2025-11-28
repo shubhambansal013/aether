@@ -3,7 +3,7 @@ name: Robust Arduino CLI OTA Release
 on:
   push:
     tags:
-      - 'v*' # Trigger on any tag starting with 'v' (e.g., v2.0)
+      - 'v*' # Trigger on any tag starting with 'v' (e.g., v2.1)
 
 jobs:
   build_and_release:
@@ -25,12 +25,15 @@ jobs:
           arduino-cli core update-index
           arduino-cli core install esp8266:esp8266
           
-          # 2. Install all required external libraries from aqi_monitor.ino and OTAHandler.cpp
-          # This explicitly solves the "No such file or directory" errors (WiFiManager, Pinger, ArduinoJson, Blynk)
+          # 2. Install all required external libraries
+          # Libraries found in aqi_monitor.ino and OTAHandler.cpp
           arduino-cli lib install "WiFiManager"
-          arduino-cli lib install "Pinger"
           arduino-cli lib install "ArduinoJson"
           arduino-cli lib install "Blynk"
+
+          # FIX for Pinger: Install Pinger library directly from GitHub ZIP URL
+          PINGER_ZIP_URL="https://github.com/s00500/Pinger-Library/archive/master.zip"
+          arduino-cli lib install --zip-path "$PINGER_ZIP_URL"
           
       - name: ⚙️ Compile Firmware and Prepare Asset
         id: compile
