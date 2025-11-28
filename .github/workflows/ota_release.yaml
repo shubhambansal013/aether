@@ -1,4 +1,4 @@
-name: Robust Arduino CLI OTA Release
+name: Robust Ardu CLI OTA Release
 
 on:
   push:
@@ -37,7 +37,7 @@ jobs:
         id: compile
         run: |
           FQBN="esp8266:esp8266:nodemcuv2"
-          SKETCH_NAME="aqi_monitor.ino" 
+          SKETCH_NAME="airmon.ino" 
           
           echo "Compiling sketch: $SKETCH_NAME with FQBN: $FQBN"
 
