@@ -10,6 +10,8 @@
 #include "BlynkHandler.h"
 #include "blynk_config.h"
 #include "OTAHandler.h" // Include OTAHandler
+#include "DHTSensor.h" // Include DHTSensor
+#include "OLEDDisplay.h" // Include OLEDDisplay
 
 // ----------------------------------------------------------------------
 // ⚙️ FIRMWARE VERSION & SYSTEM CONSTANTS ��️
@@ -50,6 +52,8 @@ Pinger pinger;
 PMSensor pmSensor(SENSOR_RX_PIN, SENSOR_TX_PIN);
 BlynkHandler blynkHandler;
 OTAHandler otaHandler(FIRMWARE_VERSION, GITHUB_REPO_USER, GITHUB_REPO_NAME, FIRMWARE_BIN_NAME); // OTA Handler instance
+DHTSensor dhtSensor;
+OLEDDisplay oledDisplay;
 
 // Cloud Variables
 float pm1_0_val;
@@ -148,6 +152,12 @@ void setup() {
 
     // 5. Initialize Sensor Mock/Serial
     pmSensor.begin(SENSOR_BAUD_RATE);
+
+    // 6. Initialize DHT22 Sensor
+    dhtSensor.setup();
+
+    // 7. Initialize OLED Display
+    oledDisplay.setup();
 }
 
 void loop() {
@@ -166,6 +176,21 @@ void loop() {
             blynkHandler.sendSensorData(pm1_0_val, pm2_5_val, pm10_0_val);
         } else {
             Serial.println("Sensor read failed (if not mocking).");
+        }
+
+        // Read DHT22 data and display on OLED
+        float h = dhtSensor.readHumidity();
+        float t = dhtSensor.readTemperature();
+
+        if (!isnan(h) && !isnan(t)) {
+            String tempStr = "Temp: " + String(t) + " *C";
+            String humStr = "Hum: " + String(h) + " %";
+            String pm25Str = "PM2.5: " + String(pm2_5_val);
+            oledDisplay.printMessage(tempStr, humStr, pm25Str);
+            Serial.println(tempStr);
+            Serial.println(humStr);
+        } else {
+            oledDisplay.printMessage("DHT22 Read", "Failed!");
         }
 
         lastSendTime = millis();
