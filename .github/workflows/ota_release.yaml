@@ -3,7 +3,7 @@ name: Robust Arduino CLI OTA Release
 on:
   push:
     tags:
-      - 'v*' # Trigger on any tag starting with 'v' (e.g., v2.2)
+      - 'v*' # Trigger on any tag starting with 'v' (e.g., v2.3)
 
 jobs:
   build_and_release:
@@ -16,7 +16,7 @@ jobs:
       - name: 📦 Setup Arduino CLI and Tools
         uses: arduino/setup-arduino-cli@v2 
 
-      # CRITICAL FIX: Enables installation from ZIP URLs for the Pinger library
+      # CRITICAL FIX: Enables installation from ZIP URLs
       - name: 🔐 Enable Zip/Git Library Installation
         run: |
           arduino-cli config set library.enable_unsafe_install true 
@@ -35,8 +35,8 @@ jobs:
           arduino-cli lib install "ArduinoJson"
           arduino-cli lib install "Blynk"
 
-          # Pinger library installed via ZIP path (now enabled by the previous step)
-          PINGER_ZIP_URL="https://github.com/s00500/Pinger-Library/archive/master.zip"
+          # Pinger library installed via ZIP path (URL format corrected)
+          PINGER_ZIP_URL="https://github.com/s00500/Pinger-Library/archive/refs/heads/master.zip"
           arduino-cli lib install --zip-path "$PINGER_ZIP_URL"
           
       - name: ⚙️ Compile Firmware and Prepare Asset
