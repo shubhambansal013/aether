@@ -1,9 +1,9 @@
-name: Arduino OTA Release
+name: Arduino OTA Release (Fixed)
 
 on:
   push:
     tags:
-      - 'v*' # Trigger on any tag starting with 'v' (e.g., v1.2, v2.0.0)
+      - 'v*' # Trigger on any tag starting with 'v'
 
 jobs:
   build_and_release:
@@ -13,47 +13,49 @@ jobs:
       - name: ⬇️ Checkout Repository
         uses: actions/checkout@v4
 
-      - name: 📦 Install ESP8266 Core and Libraries
-        uses: arduino/setup-arduino-cli@v2
-        with:
-          version: latest
-          # Install the ESP8266 board core
-          additional-urls: https://arduino.esp8266.com/stable/package_esp8266com_index.json
-          # You can specify required libraries here, e.g., "ArduinoJson"
-          # libraries: |
-          #   ArduinoJson@6
-        
-      - name: ⚙️ Compile Firmware with Arduino CLI
-        id: compile
+      - name: 📦 Setup Arduino CLI
+        # This step installs the command-line interface
+        uses: arduino/setup-arduino-cli@v2 
+
+      - name: 🔌 Install ESP8266 Core
         run: |
-          # 1. Install ESP8266 board core
+          # 1. Add the ESP8266 board manager URL
+          arduino-cli config add board_manager.additional_urls https://arduino.esp8266.com/stable/package_esp8266com_index.json
+          # 2. Update the board index
           arduino-cli core update-index
+          # 3. Install the ESP8266 core
           arduino-cli core install esp8266:esp8266
           
-          # 2. Compile the sketch
-          # NOTE: Replace 'airmon.ino' with your main sketch file name if it's different.
-          # We use the board FQBN for NodeMCU 1.0 (ESP-12E Module)
+      - name: ⚙️ Compile Firmware
+        id: compile
+        run: |
+          # NOTE: 
+          # FQBN is for NodeMCU 1.0 (ESP-12E Module)
           FQBN="esp8266:esp8266:nodemcuv2"
-          SKETCH_NAME="airmon.ino"
           
+          # ⚠️ Update this line with the EXACT name of your main .ino file ⚠️
+          SKETCH_NAME="airmon.ino" 
+          
+          # Compile the sketch
           arduino-cli compile --fqbn $FQBN $SKETCH_NAME
           
-          # 3. Determine the path to the compiled .bin file
-          # The path is complex, so we capture it from the compilation output
-          BUILD_DIR=$(find /tmp/arduino-cli-build* -type d -name "airmon.ino.bin" -exec dirname {} \;)
-          BIN_PATH="$BUILD_DIR/airmon.ino.bin"
+          # Find the compiled binary and rename it to firmware.bin
+          # This search is more robust than relying on /tmp path
+          BUILD_DIR=$(find . -name "$SKETCH_NAME.bin" | head -1 | xargs dirname)
+          if [ -z "$BUILD_DIR" ]; then
+            echo "Error: Compiled binary not found."
+            exit 1
+          fi
           
-          # 4. Rename the binary to the required firmware.bin for the OTA link
-          cp $BIN_PATH ./firmware.bin
+          cp "$BUILD_DIR/$SKETCH_NAME.bin" ./firmware.bin
           
-          # 5. Output the final path for the next step
+          # Output the final path for the next step
           echo "bin_path=./firmware.bin" >> $GITHUB_OUTPUT
-        # The compiled file is now in the root directory as ./firmware.bin
 
       - name: 📤 Create GitHub Release and Upload Asset
         uses: softprops/action-gh-release@v2
         with:
-          files: ./firmware.bin:firmware.bin # Uploads ./firmware.bin, naming the asset 'firmware.bin'
+          files: ./firmware.bin:firmware.bin 
           prerelease: false
           draft: false
         env:
