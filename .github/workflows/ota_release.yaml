@@ -26,28 +26,27 @@ jobs:
           arduino-cli core install esp8266:esp8266
           
           # 2. Install all required external libraries
-          # Libraries from aqi_monitor.ino, OTAHandler.cpp, etc.
           arduino-cli lib install "WiFiManager"
           arduino-cli lib install "ArduinoJson"
           arduino-cli lib install "Blynk"
-          arduino-cli lib install "ESP8266-ping" # Final fix for Pinger library name
+          arduino-cli lib install "ESP8266-ping" 
           
       - name: ⚙️ Compile Firmware and Prepare Asset
         id: compile
         run: |
           FQBN="esp8266:esp8266:nodemcuv2"
-          SKETCH_NAME="airmon.ino" 
+          SKETCH_NAME="aqi_monitor.ino" 
           
           echo "Compiling sketch: $SKETCH_NAME with FQBN: $FQBN"
 
           # Final Compile
           arduino-cli compile --fqbn $FQBN $SKETCH_NAME
           
-          # CRITICAL FIX: Find the compiled binary file globally in the temporary build path
-          BIN_FILE_PATH=$(find /tmp/arduino-cli-build* -type f -name "$SKETCH_NAME.bin" | head -1)
+          # CRITICAL FIX: Find the compiled binary file by searching the entire current workspace
+          BIN_FILE_PATH=$(find . -type f -name "$SKETCH_NAME.bin" | head -1)
 
           if [ -z "$BIN_FILE_PATH" ]; then
-            echo "Error: Compiled binary not found in expected temporary paths."
+            echo "Error: Compiled binary not found in expected paths. Check build output structure."
             exit 1
           fi
           
@@ -63,7 +62,6 @@ jobs:
       - name: 📤 Create GitHub Release and Upload Asset
         uses: softprops/action-gh-release@v2
         with:
-          # Uploads the compiled ./firmware.bin file and names the asset 'firmware.bin'
           files: ./firmware.bin:firmware.bin 
           tag_name: ${{ steps.compile.outputs.tag_name }}
           prerelease: false
