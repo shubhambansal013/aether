@@ -1,0 +1,9 @@
+// blynk_config.h
+#ifndef BLYNK_CONFIG_H
+#define BLYNK_CONFIG_H
+
+#define BLYNK_TEMPLATE_ID "YOUR_BLYNK_TEMPLATE_ID"
+#define BLYNK_TEMPLATE_NAME "AQI monitor"
+#define BLYNK_AUTH_TOKEN "YOUR_BLYNK_AUTH_TOKEN"
+
+#endif // BLYNK_CONFIG_H
