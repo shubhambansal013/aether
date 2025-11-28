@@ -1,0 +1,53 @@
+name: PlatformIO OTA Release
+
+on:
+  push:
+    tags:
+      - 'v*' # Trigger on any tag starting with 'v' (e.g., v1.2, v2.0.0)
+
+jobs:
+  build_and_release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: ⬇️ Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: 🛠️ Install PlatformIO Core
+        run: pip install platformio
+
+      - name: ⚙️ Build Firmware Binary
+        run: pio run
+        # This command runs PlatformIO, builds your project, and generates a .bin file.
+        # It assumes your PlatformIO project is in the root directory.
+
+      - name: 📦 Find Binary File Path
+        # The exact path depends on your platformio.ini environment.
+        # This example assumes the environment is named 'nodemcuv2' or similar.
+        # Check your .pio/build folder locally to confirm the exact path.
+        id: find_bin
+        run: |
+          BUILD_ENV=$(grep 'env:' platformio.ini | head -1 | cut -d ':' -f 2 | xargs)
+          BIN_PATH=".pio/build/$BUILD_ENV/firmware.bin"
+          echo "bin_path=$BIN_PATH" >> $GITHUB_OUTPUT
+        # Note: You might need to adjust the logic above if you have multiple build environments.
+        # A simpler approach is to hardcode the path if you only use one environment:
+        # echo "bin_path=.pio/build/nodemcuv2/firmware.bin" >> $GITHUB_OUTPUT
+
+      - name: 📤 Create GitHub Release and Upload Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          # The tag is automatically taken from the push event
+          files: ${{ steps.find_bin.outputs.bin_path }}:firmware.bin
+          # The file is renamed to 'firmware.bin' when uploaded as an asset.
+          # This ensures the URL in your C++ code always works.
+          prerelease: false
+          draft: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITHUB_TOKEN is a temporary token automatically provided by GitHub for Actions
