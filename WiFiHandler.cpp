@@ -3,102 +3,104 @@
 #include "WiFiHandler.h"
 #include <ESP8266WiFi.h>
 
-// Helper function (defined in this translation unit, no class scope needed)
-const int MAX_SCAN_ATTEMPTS = 5; 
-
-bool isSSIDAvailable(const char* targetSsid) {
-    if (targetSsid == nullptr || targetSsid[0] == '\0') {
-        return false;
-    }
-    
-    Serial.println("Starting multiple scan attempts for saved SSID...");
-    
-    for (int attempt = 1; attempt <= MAX_SCAN_ATTEMPTS; ++attempt) {
-        Serial.print("Scan Attempt #");
-        Serial.print(attempt);
-        Serial.print("...");
-        
-        int n = WiFi.scanNetworks(); 
-        
-        if (n > 0) {
-            for (int i = 0; i < n; ++i) {
-                if (WiFi.SSID(i) == String(targetSsid)) {
-                    Serial.println("SUCCESS! SSID found.");
-                    return true;
-                }
-            }
-        }
-        
-        Serial.println("Not found. Waiting 2s.");
-        delay(2000); 
-    }
-    
-    Serial.print("FAILURE: Saved SSID [");
-    Serial.print(targetSsid);
-    Serial.println("] not found after all attempts.");
-    return false;
-}
-
 // --- Public Methods ---
 
-bool WiFiHandler::connect(unsigned long quickConnectTimeoutMs, int apTimeoutSec) {
-    
+void WiFiHandler::startConnect(unsigned long quickConnectTimeoutMs, int apTimeoutSec) {
+    _quickConnectTimeoutMs = quickConnectTimeoutMs;
+    _apTimeoutSec = apTimeoutSec;
+    _connectionAttemptInProgress = false;
+    _apModeStarted = false;
+
     // NOTE: This uses the static callback functions defined below
     wifiManager.setSaveConfigCallback(saveConfigCallback);
     wifiManager.setAPCallback(configModeCallback);
-    
+
     const char* savedSsid = wifiManager.getWiFiSSID().c_str();
 
     // Path 1: Case #1 - No saved config: Go straight to AP mode.
     if (savedSsid[0] == '\0') {
         Serial.println("Case #1: No saved config. Starting Config AP...");
-        wifiManager.setConnectTimeout(apTimeoutSec); 
-        return wifiManager.autoConnect("airmon_AP", "password");
-    }
+        // wifiManager.setConnectTimeout(_apTimeoutSec); // This timeout is for STA mode connection attempts, not AP mode duration.
+        // For AP mode duration, it's better to let autoConnect manage it or implement custom timeout logic in handleConnect
+        _apModeStarted = true;
+        wifiManager.autoConnect("airmon_AP", "password"); // This is blocking, we need to handle it differently
+        // For non-blocking AP, we'd typically run it in a separate task or check status frequently.
+        // For now, assume autoConnect eventually returns or we restart.
+    } else {
+        // Path 2: Saved config exists. Attempt quick connect.
+        Serial.print("Attempting quick connect with saved credentials (");
+        Serial.print(_quickConnectTimeoutMs / 1000);
+        Serial.println("s timeout)...");
 
-    // Path 2 & 3 Logic
-    if (isSSIDAvailable(savedSsid)) {
-        Serial.print("Case #3: Saved SSID is available. Attempting connect...");
-        
-        WiFi.mode(WIFI_STA); 
+        WiFi.mode(WIFI_STA);
         WiFi.begin();
-        
-        unsigned long startTime = millis();
-        while (WiFi.status() != WL_CONNECTED && (millis() - startTime) < quickConnectTimeoutMs) {
-            delay(500);
-            Serial.print(".");
-        }
-        
-        if (WiFi.status() == WL_CONNECTED) {
-            Serial.println("\nSUCCESS! Connected with saved credentials.");
-            return true; 
-        }
-
-        Serial.println("\nCase #3 Failed: Connection attempt timed out or failed.");
+        _connectStartTime = millis();
+        _connectionAttemptInProgress = true;
     }
-    
-    // Path 3: Case #2 & Failed Case #3 - Fallback to AP Mode.
-    Serial.println("Starting Config AP fallback. User intervention required.");
-    
-    wifiManager.setConnectTimeout(apTimeoutSec); 
-    
-    return wifiManager.autoConnect("airmon_AP", "password");
 }
 
-void WiFiHandler::resetSettings() { // <<<--- FIX: Correct Definition for ResetHandler
+bool WiFiHandler::handleConnect() {
+    if (WiFi.status() == WL_CONNECTED) {
+        if (_connectionAttemptInProgress) {
+            Serial.println("\nSUCCESS! Connected with saved credentials.");
+            _connectionAttemptInProgress = false; // Connection established
+        }
+        return true;
+    }
+
+    if (_apModeStarted) {
+        // If AP mode was started, we assume autoConnect is handling it.
+        // This part might need refinement if a truly non-blocking AP mode with timeout is desired.
+        // For now, if we are in AP mode, we consider ourselves "connected" to the portal.
+        return false; // Not connected to external WiFi, but AP is active.
+    }
+
+    if (_connectionAttemptInProgress) {
+        if ((millis() - _connectStartTime) < _quickConnectTimeoutMs) {
+            // Still within timeout, keep trying
+            return false;
+        } else {
+            // Quick connect timed out, fallback to AP mode
+            Serial.println("\nQuick connect timed out. Starting Config AP fallback.");
+            _connectionAttemptInProgress = false;
+            _apModeStarted = true;
+            wifiManager.setConnectTimeout(_apTimeoutSec); // This timeout is for STA mode connection *attempts* when in AP mode
+            wifiManager.autoConnect("airmon_AP", "password");
+            // If autoConnect returns false, it means AP mode also failed or timed out.
+            // In a real non-blocking scenario, we'd check its status in subsequent loops.
+            return false; // Not connected, AP mode initiated.
+        }
+    }
+    return false; // Not connected, and no active connection attempt.
+}
+
+
+String WiFiHandler::getWifiStatus() {
+    switch (WiFi.status()) {
+        case WL_IDLE_STATUS: return "Idle";
+        case WL_NO_SSID_AVAIL: return "No SSID";
+        case WL_SCAN_COMPLETED: return "Scan done";
+        case WL_CONNECTED: return "Connected";
+        case WL_CONNECT_FAILED: return "Conn Failed";
+        case WL_CONNECTION_LOST: return "Conn Lost";
+        case WL_DISCONNECTED: return "Disconn.";
+        default: return "Unknown";
+    }
+}
+
+void WiFiHandler::resetSettings() {
     Serial.println("Clearing Wi-Fi credentials via WiFiHandler.");
     wifiManager.resetSettings();
 }
 
 // --- Private Static Callback Implementations ---
 
-void WiFiHandler::saveConfigCallback () { // <<<--- CRITICAL FIX: Added WiFiHandler::
+void WiFiHandler::saveConfigCallback () {
     Serial.println("Wi-Fi credentials saved to EEPROM.");
 }
 
-void WiFiHandler::configModeCallback (WiFiManager *myWiFiManager) { // <<<--- CRITICAL FIX: Added WiFiHandler::
+void WiFiHandler::configModeCallback (WiFiManager *myWiFiManager) {
     Serial.println("Entered Configuration Mode (Connect to AP airmon_AP).");
     Serial.print("Config Portal IP: ");
     Serial.println(WiFi.softAPIP());
-    
 }

@@ -68,8 +68,9 @@ unsigned long ledStateTime = 0;
 bool ledState = HIGH;
 int blinkCount = 0;
 bool isBlinking = false;
-bool isConnected = false;
+// Removed isConnected
 unsigned long lastSendTime = 0;
+bool _blynkAndOtaInitialized = false;
 
 // --- Diagnostic Status Codes ---
 enum DiagnosticStatus {
@@ -92,7 +93,7 @@ void startBlink(DiagnosticStatus status) {
 }
 
 void updateLED() {
-    if (!isConnected) {
+    if (WiFi.status() != WL_CONNECTED) {
         // Continuous ON when trying to connect (LED solid LOW)
         digitalWrite(LED_PIN, LOW);
         return;
@@ -140,25 +141,8 @@ void setup() {
     resetHandler.checkPowerCycles();
 
     // 3. Initialize Wi-Fi
-    oledDisplay.printMessage("WiFi", "Connecting...");
-    if (!wifiHandler.connect(QUICK_CONNECT_TIMEOUT_MS, CONFIG_AP_TIMEOUT_SEC)) {
-        Serial.println("FATAL ERROR: Wi-Fi setup failed and timed out. Rebooting...");
-        oledDisplay.printMessage("WiFi Error", "Rebooting...");
-        delay(WIFI_FAIL_REBOOT_DELAY_MS);
-        ESP.reset();
-    }
-
-    // Connection successful
-    isConnected = true;
-    Serial.println("Wi-Fi connected successfully! Starting Blynk...");
-    oledDisplay.printMessage("WiFi OK", "Init Blynk...");
-
-    // 4. Initialize ArduinoOTA (for arduino-cli based updates)
-    otaHandler.setupArduinoOTA();
-
-    // 5. Connect to Blynk
-    blynkHandler.begin(BLYNK_AUTH_TOKEN, WiFi.SSID().c_str(), WiFi.psk().c_str());
-    blynkHandler.sendFirmwareVersion(FIRMWARE_VERSION);
+    oledDisplay.printMessage("WiFi", "Starting...");
+    wifiHandler.startConnect(QUICK_CONNECT_TIMEOUT_MS, CONFIG_AP_TIMEOUT_SEC);
 
     // 6. Initialize Sensor Mock/Serial
     pmSensor.begin(SENSOR_BAUD_RATE);
@@ -171,22 +155,41 @@ void setup() {
 }
 
 void loop() {
-    // 1. Handle ArduinoOTA events
-    otaHandler.handleArduinoOTA();
+    // 1. Handle Wi-Fi Connection State
+    bool currentlyConnected = (WiFi.status() == WL_CONNECTED);
+    wifiHandler.handleConnect();
 
-    // 2. Run Blynk
-    blynkHandler.run();
+    // Initialize Blynk and OTA once WiFi is connected
+    if (currentlyConnected && !_blynkAndOtaInitialized) {
+        Serial.println("Wi-Fi connected successfully! Initializing Blynk and OTA...");
+        otaHandler.setupArduinoOTA();
+        blynkHandler.begin(BLYNK_AUTH_TOKEN, WiFi.SSID().c_str(), WiFi.psk().c_str());
+        blynkHandler.sendFirmwareVersion(FIRMWARE_VERSION);
+        _blynkAndOtaInitialized = true;
+    }
 
-    // 2. Update LED Status
+    // 2. Handle ArduinoOTA events (only if initialized)
+    if (_blynkAndOtaInitialized) {
+        otaHandler.handleArduinoOTA();
+    }
+
+    // 3. Run Blynk (only if initialized and connected)
+    if (_blynkAndOtaInitialized && currentlyConnected) {
+        blynkHandler.run();
+    }
+
+    // 4. Update LED Status
     updateLED();
 
-    // 3. Run Sensor and Blynk Update Timer
+    // 5. Run Sensor and Blynk Update Timer
     if (millis() - lastSendTime > BLYNK_SEND_INTERVAL_MS) {
 
         if (pmSensor.readData(pm1_0_val, pm2_5_val, pm10_0_val, USE_MOCK_DATA)) {
             Serial.print("Data Read (Mock="); Serial.print(USE_MOCK_DATA ? "T" : "F");
             Serial.print("): PM2.5="); Serial.println(pm2_5_val);
-            blynkHandler.sendSensorData(pm1_0_val, pm2_5_val, pm10_0_val);
+            if (_blynkAndOtaInitialized && currentlyConnected) {
+                blynkHandler.sendSensorData(pm1_0_val, pm2_5_val, pm10_0_val);
+            }
         } else {
             Serial.println("Sensor read failed (if not mocking).");
         }
@@ -195,27 +198,31 @@ void loop() {
         float h = dhtSensor.readHumidity();
         float t = dhtSensor.readTemperature();
 
+        String wifiStatusStr = wifiHandler.getWifiStatus();
+
         if (!isnan(h) && !isnan(t)) {
             String tempStr = "T: " + String(t, 1) + "C";
             String humStr = "H: " + String(h, 0) + "%";
             String pm25Str = "PM2.5: " + String(pm2_5_val, 0); // Removed decimals for space
             
-            oledDisplay.printMessage(tempStr, humStr, pm25Str);
+            oledDisplay.displaySensorDataAndWifiStatus(wifiStatusStr, tempStr, humStr, pm25Str);
             
             Serial.println(tempStr);
             Serial.println(humStr);
-            blynkHandler.sendTemperatureHumidity(t, h);
+            if (_blynkAndOtaInitialized && currentlyConnected) {
+                blynkHandler.sendTemperatureHumidity(t, h);
+            }
         } else {
             // If DHT fails, still show PM data
             String pm25Str = "PM2.5: " + String(pm2_5_val, 0);
-            oledDisplay.printMessage("DHT Fail", pm25Str);
+            oledDisplay.displaySensorDataAndWifiStatus(wifiStatusStr, "DHT Fail", pm25Str, ""); // Pass empty string for line3
         }
 
         lastSendTime = millis();
     }
 
-    // 4. Run Ping Diagnostic
-    if (isConnected && millis() - lastPingTime >= PING_INTERVAL_MS) {
+    // 6. Run Ping Diagnostic (only if connected)
+    if (currentlyConnected && millis() - lastPingTime >= PING_INTERVAL_MS) {
         lastPingTime = millis();
         Serial.print("\n## Pinging Internet Target (8.8.8.8)... ");
 

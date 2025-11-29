@@ -71,3 +71,27 @@ void OLEDDisplay::printMessage(String line1, String line2, String line3) {
     
     display.display();
 }
+
+void OLEDDisplay::displaySensorDataAndWifiStatus(String wifiStatus, String line1, String line2, String line3) {
+    display.clearDisplay();
+    display.setTextColor(SSD1306_WHITE);
+    
+    // Display WiFi Status at the top (smaller font)
+    display.setTextSize(1);
+    display.setCursor(0, 0);
+    display.println("WiFi: " + wifiStatus);
+
+    // Display sensor data below
+    display.setTextSize(2);
+    display.setCursor(0, 15); // Adjust Y-coordinate to avoid overlap
+    display.println(line1);
+    
+    display.setTextSize(1);
+    display.setCursor(0, 35); // Adjust Y-coordinate
+    display.println(line2);
+    
+    display.setCursor(0, 50); // Adjust Y-coordinate
+    display.println(line3);
+    
+    display.display();
+}

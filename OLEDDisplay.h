@@ -19,6 +19,7 @@ public:
     void clear();
     void printMessage(String line1, String line2);
     void printMessage(String line1, String line2, String line3);
+    void displaySensorDataAndWifiStatus(String wifiStatus, String line1, String line2, String line3);
 
 private:
     Adafruit_SSD1306 display;
