@@ -3,7 +3,7 @@ name: Robust Arduino CLI OTA Release
 on:
   push:
     tags:
-      - 'v*' # Trigger on any tag starting with 'v' (e.g., v2.5)
+      - 'v*' # Trigger on any tag starting with 'v' (e.g., v2.6)
 
 jobs:
   build_and_release:
@@ -35,18 +35,22 @@ jobs:
         id: compile
         run: |
           FQBN="esp8266:esp8266:nodemcuv2"
-          SKETCH_NAME="airmon.ino" 
+          SKETCH_NAME="aqi_monitor.ino" 
+          BUILD_FOLDER="./ota_build_output" # Define a known output folder
           
           echo "Compiling sketch: $SKETCH_NAME with FQBN: $FQBN"
 
-          # Final Compile
-          arduino-cli compile --fqbn $FQBN $SKETCH_NAME
+          # Create the build folder
+          mkdir -p $BUILD_FOLDER
           
-          # CRITICAL FIX: Find the compiled binary file by searching the entire current workspace
-          BIN_FILE_PATH=$(find . -type f -name "$SKETCH_NAME.bin" | head -1)
+          # CRITICAL FIX: Compile and force the output to the known BUILD_FOLDER
+          arduino-cli compile --fqbn $FQBN $SKETCH_NAME --build-path $BUILD_FOLDER
 
-          if [ -z "$BIN_FILE_PATH" ]; then
-            echo "Error: Compiled binary not found in expected paths. Check build output structure."
+          # Now the file location is guaranteed
+          BIN_FILE_PATH="$BUILD_FOLDER/$SKETCH_NAME.bin"
+
+          if [ ! -f "$BIN_FILE_PATH" ]; then
+            echo "Error: Compiled binary not found at the expected path: $BIN_FILE_PATH"
             exit 1
           fi
           
