@@ -18,8 +18,8 @@ void OLEDDisplay::setup() {
     }
     Serial.println("OLEDDisplay: display.begin() successful.");
 
-    // Optional: Maximize contrast
-    display.setContrast(255);
+    // FIX: Removed setContrast(255) as it is not supported by the standard Adafruit_SSD1306 library.
+    // The library handles contrast initialization automatically in begin().
 
     display.clearDisplay();
     
