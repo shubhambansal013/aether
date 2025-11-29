@@ -1,65 +1,73 @@
 #include "OLEDDisplay.h"
 
+// Constructor
 OLEDDisplay::OLEDDisplay() : display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET) {}
 
 void OLEDDisplay::setup() {
     Serial.println("OLEDDisplay: Initializing Wire library...");
-    Wire.begin();
-    Serial.println("OLEDDisplay: Wire library initialized.");
+    
+    // FIX: Explicitly set SDA to D2 and SCL to D1
+    Wire.begin(D2, D1); 
+    Serial.println("OLEDDisplay: Wire library initialized with D2(SDA) and D1(SCL).");
 
     Serial.print("OLEDDisplay: Attempting display.begin(0x3C)...");
-    if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3C for 128x64
+    // SSD1306_SWITCHCAPVCC generates the high voltage from the 3.3v line internally
+    if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { 
         Serial.println(F("SSD1306 allocation failed"));
-        for (;;); // Don't proceed, loop forever
+        for (;;); // Loop forever if allocation fails
     }
     Serial.println("OLEDDisplay: display.begin() successful.");
 
-    // Set contrast to maximum (0-255). This often helps with blank displays.
-    Serial.println("OLEDDisplay: Setting display contrast to max...");
+    // Optional: Maximize contrast
     display.setContrast(255);
 
-    Serial.println("OLEDDisplay: Calling display.display() first time...");
-    display.display();
-    Serial.println("OLEDDisplay: First display.display() called. Delaying 2s.");
-    delay(2000);
-
-    Serial.println("OLEDDisplay: Clearing display...");
     display.clearDisplay();
-    Serial.println("OLEDDisplay: Setting text properties...");
+    
+    // Set default text properties
     display.setTextSize(1);
-    display.setTextColor(WHITE);
+    display.setTextColor(SSD1306_WHITE); // Use SSD1306_WHITE for compatibility
     display.setCursor(0,0);
-    Serial.println("OLEDDisplay: Printing 'OLED Initialized!' message...");
+    
     display.println("OLED Initialized!");
-    Serial.println("OLEDDisplay: Calling display.display() second time...");
     display.display();
+    
     Serial.println("OLED Display initialized and message displayed.");
 }
 
 void OLEDDisplay::clear() {
     display.clearDisplay();
+    display.display();
 }
 
 void OLEDDisplay::printMessage(String line1, String line2) {
     display.clearDisplay();
+    display.setTextColor(SSD1306_WHITE);
+    
     display.setTextSize(2);
     display.setCursor(0, 0);
     display.println(line1);
+    
     display.setTextSize(1);
     display.setCursor(0, 20);
     display.println(line2);
+    
     display.display();
 }
 
 void OLEDDisplay::printMessage(String line1, String line2, String line3) {
     display.clearDisplay();
+    display.setTextColor(SSD1306_WHITE);
+    
     display.setTextSize(2);
     display.setCursor(0, 0);
     display.println(line1);
+    
     display.setTextSize(1);
     display.setCursor(0, 20);
     display.println(line2);
-    display.setCursor(0, 30);
+    
+    display.setCursor(0, 35); // Adjusted spacing slightly
     display.println(line3);
+    
     display.display();
 }
