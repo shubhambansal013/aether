@@ -143,8 +143,8 @@ void setup() {
     isConnected = true;
     Serial.println("Wi-Fi connected successfully! Starting Blynk...");
 
-    // 3. Check for and perform OTA updates
-    otaHandler.checkAndUpdate();
+    // 3. Initialize ArduinoOTA (for arduino-cli based updates)
+    otaHandler.setupArduinoOTA();
 
     // 4. Connect to Blynk
     blynkHandler.begin(BLYNK_AUTH_TOKEN, WiFi.SSID().c_str(), WiFi.psk().c_str());
@@ -161,7 +161,10 @@ void setup() {
 }
 
 void loop() {
-    // 1. Run Blynk
+    // 1. Handle ArduinoOTA events
+    otaHandler.handleArduinoOTA();
+
+    // 2. Run Blynk
     blynkHandler.run();
 
     // 2. Update LED Status
