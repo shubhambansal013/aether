@@ -26,6 +26,24 @@ This project is designed for an ESP8266 NodeMCU board.
 *   **SDA (Data):** D1 (GPIO5)
 *   **SCL (Clock):** D2 (GPIO4)
 
+### RGB LED (Common Cathode)
+
+A 4-pin common cathode RGB LED is used for a rough visual indicator of device status and air quality. Each color pin (R, G, B) should be connected in series with a 220-ohm current-limiting resistor to the specified ESP8266 GPIO pin. The common cathode pin should be connected to ESP8266 GND.
+
+*   **Red Pin (via resistor):** D0 (GPIO16)
+*   **Green Pin (via resistor):** D3 (GPIO0)
+*   **Blue Pin (via resistor):** D7 (GPIO13)
+
+#### RGB LED Indicator Scheme:
+
+*   **Pulsing Blue:** Initial setup, Wi-Fi connecting, or in AP configuration mode. Indicates the device is busy with network tasks.
+*   **Solid Green:** Wi-Fi connected, and PM2.5 levels are good (< 12 µg/m³).
+*   **Solid Yellow/Amber (Red + Green):** Wi-Fi connected, and PM2.5 levels are moderate (12 µg/m³ <= PM2.5 < 35 µg/m³).
+*   **Solid Red:** Wi-Fi connected, and PM2.5 levels are bad (>= 35 µg/m³).
+*   **Solid Magenta (Red + Blue):** Wi-Fi connected, but sensor data is unavailable or there's a sensor error.
+*   **Blinking Green:** Short blinks to indicate a successful internet ping.
+*   **Blinking Red:** Short blinks to indicate a failed internet ping.
+
 ### PMSA003 Air Quality Sensor
 
 *   **RX (ESP8266):** D1 (GPIO5) - *Connected to PM Sensor TX*
@@ -33,7 +51,7 @@ This project is designed for an ESP8266 NodeMCU board.
 
 ### Other
 
-*   **LED Pin:** D4 (GPIO2) - *Note: This pin is also used for the DHT22. Ensure you understand the implications or use a different pin for the LED if conflicts arise.*
+*   **Onboard LED:** D4 (GPIO2) - *This pin is still used by the DHT22 sensor; its original purpose as a general status LED has been replaced by the RGB LED. No changes are needed here, but be aware of its dual role if troubleshooting.*
 
 ## Libraries Used
 
