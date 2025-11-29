@@ -13,6 +13,7 @@ public:
     void begin(const char* auth, const char* ssid, const char* pass);
     void run();
     void sendSensorData(float pm1_0, float pm2_5, float pm10_0);
+    void sendTemperatureHumidity(float temperature, float humidity);
     void sendFirmwareVersion(const char* version);
 
 private:

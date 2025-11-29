@@ -204,6 +204,7 @@ void loop() {
             
             Serial.println(tempStr);
             Serial.println(humStr);
+            blynkHandler.sendTemperatureHumidity(t, h);
         } else {
             // If DHT fails, still show PM data
             String pm25Str = "PM2.5: " + String(pm2_5_val, 0);
