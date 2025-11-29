@@ -1,5 +1,3 @@
-// aqi_monitor.ino (Main Sketch File)
-
 #include <ESP8266WiFi.h>
 #include <WiFiManager.h>
 #include <Pinger.h>
@@ -9,14 +7,14 @@
 #include "PMSensor.h"
 #include "BlynkHandler.h"
 #include "blynk_config.h"
-#include "OTAHandler.h" // Include OTAHandler
-#include "DHTSensor.h" // Include DHTSensor
-#include "OLEDDisplay.h" // Include OLEDDisplay
+#include "OTAHandler.h" 
+#include "DHTSensor.h" 
+#include "OLEDDisplay.h" 
 
 // ----------------------------------------------------------------------
-// ⚙️ FIRMWARE VERSION & SYSTEM CONSTANTS ��️
+// ⚙️ FIRMWARE VERSION & SYSTEM CONSTANTS 
 // ----------------------------------------------------------------------
-const char* FIRMWARE_VERSION = "V1.0.9 - Blynk Integration";
+const char* FIRMWARE_VERSION = "V1.0.10 - OLED Fix";
 const long DEBUG_BAUD_RATE = 115200;
 const int WIFI_FAIL_REBOOT_DELAY_MS = 3000;
 const int SETUP_DELAY_MS = 100;
@@ -32,17 +30,21 @@ const long PING_INTERVAL_MS = 10000;
 
 // --- Sensor Constants ---
 const long SENSOR_BAUD_RATE = 9600;
-const int SENSOR_RX_PIN = 5; // D1 (GPIO 5)
-const int SENSOR_TX_PIN = 4; // D2 (GPIO 4)
+
+// *** PIN ASSIGNMENT FIX ***
+// Old Config: D1/D2 (Conflicted with OLED)
+// New Config: D5/D6
+const int SENSOR_RX_PIN = D5; // GPIO 14
+const int SENSOR_TX_PIN = D6; // GPIO 12
+
 const unsigned long BLYNK_SEND_INTERVAL_MS = 2000L;
 const bool USE_MOCK_DATA = true;
 // ----------------------------------------------------------------------
 
 // --- OTA Update Constants ---
-// !!! IMPORTANT: Replace with your GitHub repository details !!!
 const char* GITHUB_REPO_USER = "shubhambansal013";
 const char* GITHUB_REPO_NAME = "airmon";
-const char* FIRMWARE_BIN_NAME = "firmware.bin"; // Name of the .bin file in your GitHub release assets
+const char* FIRMWARE_BIN_NAME = "firmware.bin"; 
 // ----------------------------------------------------------------------
 
 // --- Global Variables/Instances ---
@@ -51,7 +53,7 @@ ResetHandler resetHandler(wifiHandler);
 Pinger pinger;
 PMSensor pmSensor(SENSOR_RX_PIN, SENSOR_TX_PIN);
 BlynkHandler blynkHandler;
-OTAHandler otaHandler(FIRMWARE_VERSION, GITHUB_REPO_USER, GITHUB_REPO_NAME, FIRMWARE_BIN_NAME); // OTA Handler instance
+OTAHandler otaHandler(FIRMWARE_VERSION, GITHUB_REPO_USER, GITHUB_REPO_NAME, FIRMWARE_BIN_NAME); 
 DHTSensor dhtSensor;
 OLEDDisplay oledDisplay;
 
@@ -129,12 +131,19 @@ void setup() {
     // Initial LED State: Solid ON (LOW)
     digitalWrite(LED_PIN, LOW);
 
-    // 1. Check for Power Cycle Reset (Must be run before Wi-Fi)
+    // 1. Initialize OLED Display FIRST to show status during boot
+    // Moving this up helps debug boot issues visually
+    oledDisplay.setup();
+    oledDisplay.printMessage("System", "Booting...");
+
+    // 2. Check for Power Cycle Reset (Must be run before Wi-Fi)
     resetHandler.checkPowerCycles();
 
-    // 2. Initialize Wi-Fi
+    // 3. Initialize Wi-Fi
+    oledDisplay.printMessage("WiFi", "Connecting...");
     if (!wifiHandler.connect(QUICK_CONNECT_TIMEOUT_MS, CONFIG_AP_TIMEOUT_SEC)) {
         Serial.println("FATAL ERROR: Wi-Fi setup failed and timed out. Rebooting...");
+        oledDisplay.printMessage("WiFi Error", "Rebooting...");
         delay(WIFI_FAIL_REBOOT_DELAY_MS);
         ESP.reset();
     }
@@ -142,22 +151,23 @@ void setup() {
     // Connection successful
     isConnected = true;
     Serial.println("Wi-Fi connected successfully! Starting Blynk...");
+    oledDisplay.printMessage("WiFi OK", "Init Blynk...");
 
-    // 3. Initialize ArduinoOTA (for arduino-cli based updates)
+    // 4. Initialize ArduinoOTA (for arduino-cli based updates)
     otaHandler.setupArduinoOTA();
 
-    // 4. Connect to Blynk
+    // 5. Connect to Blynk
     blynkHandler.begin(BLYNK_AUTH_TOKEN, WiFi.SSID().c_str(), WiFi.psk().c_str());
     blynkHandler.sendFirmwareVersion(FIRMWARE_VERSION);
 
-    // 5. Initialize Sensor Mock/Serial
+    // 6. Initialize Sensor Mock/Serial
     pmSensor.begin(SENSOR_BAUD_RATE);
 
-    // 6. Initialize DHT22 Sensor
+    // 7. Initialize DHT22 Sensor
     dhtSensor.setup();
-
-    // 7. Initialize OLED Display
-    oledDisplay.setup();
+    
+    oledDisplay.printMessage("System", "Ready!");
+    delay(1000);
 }
 
 void loop() {
@@ -186,14 +196,18 @@ void loop() {
         float t = dhtSensor.readTemperature();
 
         if (!isnan(h) && !isnan(t)) {
-            String tempStr = "Temp: " + String(t) + " *C";
-            String humStr = "Hum: " + String(h) + " %";
-            String pm25Str = "PM2.5: " + String(pm2_5_val);
+            String tempStr = "T: " + String(t, 1) + "C";
+            String humStr = "H: " + String(h, 0) + "%";
+            String pm25Str = "PM2.5: " + String(pm2_5_val, 0); // Removed decimals for space
+            
             oledDisplay.printMessage(tempStr, humStr, pm25Str);
+            
             Serial.println(tempStr);
             Serial.println(humStr);
         } else {
-            oledDisplay.printMessage("DHT22 Read", "Failed!");
+            // If DHT fails, still show PM data
+            String pm25Str = "PM2.5: " + String(pm2_5_val, 0);
+            oledDisplay.printMessage("DHT Fail", pm25Str);
         }
 
         lastSendTime = millis();
