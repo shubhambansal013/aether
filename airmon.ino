@@ -142,7 +142,7 @@ void setup() {
 
     // 3. Initialize Wi-Fi
     oledDisplay.printMessage("WiFi", "Starting...");
-    wifiHandler.startConnect(QUICK_CONNECT_TIMEOUT_MS, CONFIG_AP_TIMEOUT_SEC);
+    wifiHandler.startConnect(QUICK_CONNECT_TIMEOUT_MS, (unsigned long)CONFIG_AP_TIMEOUT_SEC);
 
     // 6. Initialize Sensor Mock/Serial
     pmSensor.begin(SENSOR_BAUD_RATE);
