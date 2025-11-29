@@ -14,6 +14,10 @@ void OLEDDisplay::setup() {
     }
     Serial.println("OLEDDisplay: display.begin() successful.");
 
+    // Set contrast to maximum (0-255). This often helps with blank displays.
+    Serial.println("OLEDDisplay: Setting display contrast to max...");
+    display.setContrast(255);
+
     Serial.println("OLEDDisplay: Calling display.display() first time...");
     display.display();
     Serial.println("OLEDDisplay: First display.display() called. Delaying 2s.");
