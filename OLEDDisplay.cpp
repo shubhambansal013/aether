@@ -3,20 +3,33 @@
 OLEDDisplay::OLEDDisplay() : display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET) {}
 
 void OLEDDisplay::setup() {
+    Serial.println("OLEDDisplay: Initializing Wire library...");
     Wire.begin();
+    Serial.println("OLEDDisplay: Wire library initialized.");
+
+    Serial.print("OLEDDisplay: Attempting display.begin(0x3C)...");
     if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3C for 128x64
         Serial.println(F("SSD1306 allocation failed"));
         for (;;); // Don't proceed, loop forever
     }
+    Serial.println("OLEDDisplay: display.begin() successful.");
+
+    Serial.println("OLEDDisplay: Calling display.display() first time...");
     display.display();
+    Serial.println("OLEDDisplay: First display.display() called. Delaying 2s.");
     delay(2000);
+
+    Serial.println("OLEDDisplay: Clearing display...");
     display.clearDisplay();
+    Serial.println("OLEDDisplay: Setting text properties...");
     display.setTextSize(1);
     display.setTextColor(WHITE);
     display.setCursor(0,0);
+    Serial.println("OLEDDisplay: Printing 'OLED Initialized!' message...");
     display.println("OLED Initialized!");
+    Serial.println("OLEDDisplay: Calling display.display() second time...");
     display.display();
-    Serial.println("OLED Display initialized.");
+    Serial.println("OLED Display initialized and message displayed.");
 }
 
 void OLEDDisplay::clear() {
