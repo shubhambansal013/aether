@@ -44,7 +44,7 @@ const int SENSOR_RX_PIN = D5; // GPIO 14
 const int SENSOR_TX_PIN = D6; // GPIO 12
 
 const unsigned long BLYNK_SEND_INTERVAL_MS = 2000L;
-const bool USE_MOCK_DATA = true;
+const bool USE_MOCK_DATA = false;
 // ----------------------------------------------------------------------
 
 // --- OTA Update Constants ---
