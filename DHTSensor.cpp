@@ -1,7 +1,7 @@
 #include "DHTSensor.h"
 #include <Arduino.h>
 
-DHTSensor::DHTSensor() : dht(DHTPIN, DHTTYPE) {}
+DHTSensor::DHTSensor() : dht(DHT_PIN, DHTTYPE) {}
 
 void DHTSensor::setup() {
     dht.begin();

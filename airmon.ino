@@ -7,6 +7,7 @@
 #include "PMSensor.h"
 #include "BlynkHandler.h"
 #include "blynk_config.h"
+#include "pins.h"
 #include "OTAHandler.h" 
 #include "DHTSensor.h" 
 #include "OLEDDisplay.h" 
@@ -29,20 +30,8 @@ const int CONFIG_AP_TIMEOUT_SEC = 600;
 const IPAddress PING_TARGET(8, 8, 8, 8);
 const long PING_INTERVAL_MS = 10000;
 
-// RGB LED Pins (Common Cathode)
-const int RGB_LED_RED_PIN = D0;   // GPIO16
-const int RGB_LED_GREEN_PIN = D3; // GPIO0
-const int RGB_LED_BLUE_PIN = D7;  // GPIO13
-
 // --- Sensor Constants ---
 const long SENSOR_BAUD_RATE = 9600;
-
-// *** PIN ASSIGNMENT FIX ***
-// Old Config: D1/D2 (Conflicted with OLED)
-// New Config: D5/D6
-const int SENSOR_RX_PIN = D5; // GPIO 14
-const int SENSOR_TX_PIN = D6; // GPIO 12
-
 const unsigned long BLYNK_SEND_INTERVAL_MS = 2000L;
 const bool USE_MOCK_DATA = false;
 // ----------------------------------------------------------------------
@@ -155,12 +144,12 @@ void loop() {
             float t = dhtSensor.readTemperature();
             String wifiStatusStr = wifiHandler.getWifiStatus();
 
+            // Always attempt to display PM data, and DHT data if available
+            oledDisplay.displaySensorDataAndWifiStatus(wifiStatusStr, pm1_0_val, pm2_5_val, pm10_0_val, h, t);
+
             if (!isnan(h) && !isnan(t)) {
                 String tempStr = "T: " + String(t, 1) + "C";
                 String humStr = "H: " + String(h, 0) + "%";
-                String pm25Str = "PM2.5: " + String(pm2_5_val, 0);
-                
-                oledDisplay.displaySensorDataAndWifiStatus(wifiStatusStr, tempStr, humStr, pm25Str);
                 
                 Serial.println(tempStr);
                 Serial.println(humStr);
@@ -169,9 +158,7 @@ void loop() {
                     blynkHandler.sendTemperatureHumidity(t, h);
                 }
             } else {
-                // If DHT fails, still show PM data
-                String pm25Str = "PM2.5: " + String(pm2_5_val, 0);
-                oledDisplay.displaySensorDataAndWifiStatus(wifiStatusStr, "DHT Fail", pm25Str, "");
+                Serial.println("DHT Sensor read failed.");
             }
         } else {
             Serial.println("Sensor read failed (if not mocking).");
