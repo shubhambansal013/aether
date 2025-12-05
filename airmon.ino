@@ -136,45 +136,45 @@ void loop() {
     }
 
     // 4. Update LED Status (using RGB LED Handler)
-    bool sensorDataCurrentlyAvailable = pmSensor.readData(pm1_0_val, pm2_5_val, pm10_0_val, USE_MOCK_DATA); // Read data once per loop iteration
-    rgbLEDHandler.updateLED(currentlyConnected, pm2_5_val, sensorDataCurrentlyAvailable); // New call
+    bool sensorDataAvailable = pmSensor.readData(pm1_0_val, pm2_5_val, pm10_0_val, USE_MOCK_DATA);
+    rgbLEDHandler.updateLED(currentlyConnected, pm2_5_val, sensorDataAvailable);
 
 
     // 5. Run Sensor and Blynk Update Timer
     if (millis() - lastSendTime > BLYNK_SEND_INTERVAL_MS) {
-
-        if (sensorDataCurrentlyAvailable) { // Use the flag set above
+        if (sensorDataAvailable) {
             Serial.print("Data Read (Mock="); Serial.print(USE_MOCK_DATA ? "T" : "F");
             Serial.print("): PM2.5="); Serial.println(pm2_5_val);
+
             if (_blynkAndOtaInitialized && currentlyConnected) {
                 blynkHandler.sendSensorData(pm1_0_val, pm2_5_val, pm10_0_val);
             }
-        } else {
-            Serial.println("Sensor read failed (if not mocking).");
-        }
 
-        // Read DHT22 data and display on OLED
-        float h = dhtSensor.readHumidity();
-        float t = dhtSensor.readTemperature();
+            // Read DHT22 data and display on OLED only if PM data is available
+            float h = dhtSensor.readHumidity();
+            float t = dhtSensor.readTemperature();
+            String wifiStatusStr = wifiHandler.getWifiStatus();
 
-        String wifiStatusStr = wifiHandler.getWifiStatus();
+            if (!isnan(h) && !isnan(t)) {
+                String tempStr = "T: " + String(t, 1) + "C";
+                String humStr = "H: " + String(h, 0) + "%";
+                String pm25Str = "PM2.5: " + String(pm2_5_val, 0);
+                
+                oledDisplay.displaySensorDataAndWifiStatus(wifiStatusStr, tempStr, humStr, pm25Str);
+                
+                Serial.println(tempStr);
+                Serial.println(humStr);
 
-        if (!isnan(h) && !isnan(t)) {
-            String tempStr = "T: " + String(t, 1) + "C";
-            String humStr = "H: " + String(h, 0) + "%";
-            String pm25Str = "PM2.5: " + String(pm2_5_val, 0); // Removed decimals for space
-            
-            oledDisplay.displaySensorDataAndWifiStatus(wifiStatusStr, tempStr, humStr, pm25Str);
-            
-            Serial.println(tempStr);
-            Serial.println(humStr);
-            if (_blynkAndOtaInitialized && currentlyConnected) {
-                blynkHandler.sendTemperatureHumidity(t, h);
+                if (_blynkAndOtaInitialized && currentlyConnected) {
+                    blynkHandler.sendTemperatureHumidity(t, h);
+                }
+            } else {
+                // If DHT fails, still show PM data
+                String pm25Str = "PM2.5: " + String(pm2_5_val, 0);
+                oledDisplay.displaySensorDataAndWifiStatus(wifiStatusStr, "DHT Fail", pm25Str, "");
             }
         } else {
-            // If DHT fails, still show PM data
-            String pm25Str = "PM2.5: " + String(pm2_5_val, 0);
-            oledDisplay.displaySensorDataAndWifiStatus(wifiStatusStr, "DHT Fail", pm25Str, ""); // Pass empty string for line3
+            Serial.println("Sensor read failed (if not mocking).");
         }
 
         lastSendTime = millis();
