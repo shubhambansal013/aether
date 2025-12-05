@@ -1,4 +1,5 @@
 #include "OLEDDisplay.h"
+#include "pins.h"
 
 // Constructor
 OLEDDisplay::OLEDDisplay() : display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET) {}
@@ -6,9 +7,9 @@ OLEDDisplay::OLEDDisplay() : display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RE
 void OLEDDisplay::setup() {
     Serial.println("OLEDDisplay: Initializing Wire library...");
     
-    // FIX: Explicitly set SDA to D2 and SCL to D1
-    Wire.begin(D2, D1); 
-    Serial.println("OLEDDisplay: Wire library initialized with D2(SDA) and D1(SCL).");
+    // FIX: Explicitly set SDA and SCL from pins.h
+    Wire.begin(OLED_SDA_PIN, OLED_SCL_PIN); 
+    Serial.println("OLEDDisplay: Wire library initialized with pins from pins.h.");
 
     Serial.print("OLEDDisplay: Attempting display.begin(0x3C)...");
     // SSD1306_SWITCHCAPVCC generates the high voltage from the 3.3v line internally
@@ -72,7 +73,7 @@ void OLEDDisplay::printMessage(String line1, String line2, String line3) {
     display.display();
 }
 
-void OLEDDisplay::displaySensorDataAndWifiStatus(String wifiStatus, String line1, String line2, String line3) {
+void OLEDDisplay::displaySensorDataAndWifiStatus(String wifiStatus, float pm1_0, float pm2_5, float pm10_0, float humidity, float temperature) {
     display.clearDisplay();
     display.setTextColor(SSD1306_WHITE);
     
@@ -81,17 +82,31 @@ void OLEDDisplay::displaySensorDataAndWifiStatus(String wifiStatus, String line1
     display.setCursor(0, 0);
     display.println("WiFi: " + wifiStatus);
 
-    // Display sensor data below
+    // PM2.5 (most important, larger font)
     display.setTextSize(2);
-    display.setCursor(0, 15); // Adjust Y-coordinate to avoid overlap
-    display.println(line1);
+    display.setCursor(0, 15); 
+    display.print("PM2.5: ");
+    display.println(String(pm2_5, 0));
     
+    // PM1.0 and PM10.0 (smaller font, on one line if possible)
     display.setTextSize(1);
-    display.setCursor(0, 35); // Adjust Y-coordinate
-    display.println(line2);
-    
-    display.setCursor(0, 50); // Adjust Y-coordinate
-    display.println(line3);
+    display.setCursor(0, 35); 
+    display.print("PM1.0:");
+    display.print(String(pm1_0, 0));
+    display.print(" PM10:");
+    display.println(String(pm10_0, 0));
+
+    // Humidity and Temperature (smaller font, on one line if possible)
+    display.setCursor(0, 50); 
+    if (!isnan(humidity) && !isnan(temperature)) {
+        display.print("H: ");
+        display.print(String(humidity, 0));
+        display.print("% T: ");
+        display.print(String(temperature, 1));
+        display.println("C");
+    } else {
+        display.println("DHT Fail");
+    }
     
     display.display();
 }

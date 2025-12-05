@@ -1,7 +1,7 @@
 #include "DHTSensor.h"
 #include <Arduino.h>
 
-DHTSensor::DHTSensor() : dht(DHTPIN, DHTTYPE) {}
+DHTSensor::DHTSensor() : dht(DHT_PIN, DHTTYPE) {}
 
 void DHTSensor::setup() {
     dht.begin();
@@ -12,7 +12,7 @@ float DHTSensor::readHumidity() {
     float h = dht.readHumidity();
     if (isnan(h)) {
         Serial.println("Failed to read humidity from DHT sensor!");
-        return -1.0;
+        return NAN;
     }
     return h;
 }
@@ -21,7 +21,7 @@ float DHTSensor::readTemperature() {
     float t = dht.readTemperature();
     if (isnan(t)) {
         Serial.println("Failed to read temperature from DHT sensor!");
-        return -1.0;
+        return NAN;
     }
     return t;
 }

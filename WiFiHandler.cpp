@@ -17,9 +17,12 @@ void WiFiHandler::startConnect(unsigned long quickConnectTimeoutMs, unsigned lon
     // Set the connect timeout for STA mode attempts (used by WiFiManager internally)
     wifiManager.setConnectTimeout(_quickConnectTimeoutMs); 
 
-    const char* savedSsid = wifiManager.getWiFiSSID().c_str();
+    // Always start in STA mode and call WiFi.begin() to load saved credentials if any
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(); 
 
-    if (savedSsid[0] == '\0') {
+    // Check if credentials were loaded (WiFi.SSID() will be empty if not)
+    if (WiFi.SSID().length() == 0) {
         // Case #1: No saved config. Go straight to non-blocking AP mode.
         Serial.println("Case #1: No saved config. Starting Config AP...");
         wifiManager.startConfigPortal("airmon_AP", "password");
@@ -29,10 +32,8 @@ void WiFiHandler::startConnect(unsigned long quickConnectTimeoutMs, unsigned lon
         // Case #2: Saved config exists. Attempt quick connect.
         Serial.print("Attempting quick connect with saved credentials (");
         Serial.print(_quickConnectTimeoutMs / 1000);
-        Serial.println("s timeout)...");
+        Serial.println("s timeout). SSID: " + WiFi.SSID());
 
-        WiFi.mode(WIFI_STA);
-        WiFi.begin();
         _connectStartTime = millis();
         _connectMode = STA_CONNECTING;
     }
@@ -57,6 +58,7 @@ bool WiFiHandler::handleConnect() {
             } else {
                 // STA quick connect timed out, fallback to AP mode
                 Serial.println("\nSTA quick connect timed out. Starting Config AP fallback.");
+                WiFi.disconnect(); // Disconnect STA to cleanly start AP
                 WiFi.mode(WIFI_AP_STA); // Switch to AP_STA mode for config portal
                 wifiManager.startConfigPortal("airmon_AP", "password");
                 _connectMode = AP_CONFIG_PORTAL;
@@ -85,13 +87,17 @@ bool WiFiHandler::handleConnect() {
 
 
 String WiFiHandler::getWifiStatus() {
+    if (WiFi.status() == WL_CONNECTED) {
+        return "Connected";
+    }
+
     switch (_connectMode) {
         case IDLE:
-            return (WiFi.status() == WL_CONNECTED) ? "Connected" : "Idle";
+            return "Idle/Disconnected";
         case STA_CONNECTING:
             return "Connecting...";
         case AP_CONFIG_PORTAL:
-            return "AP Mode";
+            return "AP Config";
     }
     return "Unknown"; // Should not be reached
 }

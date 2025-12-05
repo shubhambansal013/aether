@@ -6,6 +6,9 @@
 #include <Arduino.h>
 #include <SoftwareSerial.h>
 
+// Forward declaration
+struct pms5003data;
+
 class PMSensor {
 public:
     /**
@@ -32,11 +35,9 @@ public:
 
 private:
     SoftwareSerial _pmSerial;
-    const int DATA_FRAME_SIZE = 32;
-    byte _dataBuffer[32];
+    pms5003data* _data;
 
-    // Placeholder for actual serial reading (will be implemented later)
-    bool readSensorSerial();
+    bool readPmsData();
     
     // Generates random numbers for testing
     void generateMockData(float& pm1_0, float& pm2_5, float& pm10_0);
