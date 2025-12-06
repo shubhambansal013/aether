@@ -46,7 +46,7 @@ const char* FIRMWARE_BIN_NAME = "firmware.bin";
 WiFiHandler wifiHandler;
 ResetHandler resetHandler(wifiHandler);
 Pinger pinger;
-PMSensor pmSensor(SENSOR_RX_PIN, SENSOR_TX_PIN);
+PMSensor pmSensor(D6, D5);
 BlynkHandler blynkHandler;
 OTAHandler otaHandler(FIRMWARE_VERSION, GITHUB_REPO_USER, GITHUB_REPO_NAME, FIRMWARE_BIN_NAME); 
 DHTSensor dhtSensor;
@@ -180,4 +180,5 @@ void loop() {
             rgbLEDHandler.startBlink(RGBLEDHandler::STATUS_PING_FAILURE); // New call
         }
     }
+delay(100);
 }
