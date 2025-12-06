@@ -8,13 +8,13 @@
 #include "BlynkHandler.h"
 #include "blynk_config.h"
 #include "pins.h"
-#include "OTAHandler.h" 
-#include "DHTSensor.h" 
-#include "OLEDDisplay.h" 
-#include "RGBLEDHandler.h" // New include
+#include "OTAHandler.h"
+#include "DHTSensor.h"
+#include "OLEDDisplay.h"
+#include "RGBLEDHandler.h"
 
 // ----------------------------------------------------------------------
-// ⚙️ FIRMWARE VERSION & SYSTEM CONSTANTS 
+// ⚙️ FIRMWARE VERSION & SYSTEM CONSTANTS
 // ----------------------------------------------------------------------
 const char* FIRMWARE_VERSION = "V1.0.10 - OLED Fix";
 const long DEBUG_BAUD_RATE = 115200;
@@ -26,7 +26,6 @@ const unsigned long QUICK_CONNECT_TIMEOUT_MS = 180000;
 const int CONFIG_AP_TIMEOUT_SEC = 600;
 
 // --- LED/Diagnostic Constants ---
-// No longer need LED_PIN constant here, it's managed by RGBLEDHandler
 const IPAddress PING_TARGET(8, 8, 8, 8);
 const long PING_INTERVAL_MS = 10000;
 
@@ -39,7 +38,7 @@ const bool USE_MOCK_DATA = false;
 // --- OTA Update Constants ---
 const char* GITHUB_REPO_USER = "shubhambansal013";
 const char* GITHUB_REPO_NAME = "pawan";
-const char* FIRMWARE_BIN_NAME = "firmware.bin"; 
+const char* FIRMWARE_BIN_NAME = "firmware.bin";
 // ----------------------------------------------------------------------
 
 // --- Global Variables/Instances ---
@@ -48,10 +47,10 @@ ResetHandler resetHandler(wifiHandler);
 Pinger pinger;
 PMSensor pmSensor(SENSOR_RX_PIN, SENSOR_TX_PIN);
 BlynkHandler blynkHandler;
-OTAHandler otaHandler(FIRMWARE_VERSION, GITHUB_REPO_USER, GITHUB_REPO_NAME, FIRMWARE_BIN_NAME); 
+OTAHandler otaHandler(FIRMWARE_VERSION, GITHUB_REPO_USER, GITHUB_REPO_NAME, FIRMWARE_BIN_NAME);
 DHTSensor dhtSensor;
 OLEDDisplay oledDisplay;
-RGBLEDHandler rgbLEDHandler(RGB_LED_RED_PIN, RGB_LED_GREEN_PIN, RGB_LED_BLUE_PIN); // New instance
+RGBLEDHandler rgbLEDHandler(RGB_LED_RED_PIN, RGB_LED_GREEN_PIN, RGB_LED_BLUE_PIN);
 
 // Cloud Variables
 float pm1_0_val;
@@ -60,7 +59,7 @@ float pm10_0_val;
 
 unsigned long lastPingTime = 0;
 unsigned long lastSendTime = 0;
-bool _blynkAndOtaInitialized = false;
+bool _otaInitialized = false; // Renamed to reflect change
 
 // ----------------------------------------------------------------------
 // SETUP & LOOP
@@ -72,16 +71,12 @@ void setup() {
     Serial.print("\nFirmware Version: ");
     Serial.println(FIRMWARE_VERSION);
 
-    // Initial LED State (handled by RGBLEDHandler.setup())
-    // digitalWrite(LED_PIN, LOW); // Remove this
-
     // 1. Initialize OLED Display FIRST to show status during boot
-    // Moving this up helps debug boot issues visually
     oledDisplay.setup();
     oledDisplay.printMessage("System", "Booting...");
 
     // Initialize RGB LED
-    rgbLEDHandler.setup(); // New call
+    rgbLEDHandler.setup();
 
     // 2. Check for Power Cycle Reset (Must be run before Wi-Fi)
     resetHandler.checkPowerCycles();
@@ -105,23 +100,26 @@ void loop() {
     bool currentlyConnected = (WiFi.status() == WL_CONNECTED);
     wifiHandler.handleConnect();
 
-    // Initialize Blynk and OTA once WiFi is connected
-    if (currentlyConnected && !_blynkAndOtaInitialized) {
-        Serial.println("Wi-Fi connected successfully! Initializing Blynk and OTA...");
+    // Initialize OTA once WiFi is connected
+    if (currentlyConnected && !_otaInitialized) {
+        Serial.println("Wi-Fi connected successfully! Initializing OTA...");
+        
+        // BLYNK HANDLER BEGIN IS NOW SIMPLIFIED TO JUST CONNECTING TO WIFI:
+        blynkHandler.begin(WiFi.SSID().c_str(), WiFi.psk().c_str()); 
+
         otaHandler.setupArduinoOTA();
-        blynkHandler.begin(BLYNK_AUTH_TOKEN, WiFi.SSID().c_str(), WiFi.psk().c_str());
-        _blynkAndOtaInitialized = true;
+        _otaInitialized = true;
     }
 
     // 2. Handle ArduinoOTA events (only if initialized)
-    if (_blynkAndOtaInitialized) {
+    if (_otaInitialized) {
         otaHandler.handleArduinoOTA();
     }
 
-    // 3. Run Blynk (only if initialized and connected)
-    if (_blynkAndOtaInitialized && currentlyConnected) {
-        blynkHandler.run();
-    }
+    // 3. Run Blynk (REMOVED - BlynkHandler::run() is not needed for HTTP API)
+    // if (_otaInitialized && currentlyConnected) {
+    //     blynkHandler.run();
+    // }
 
     // 4. Update LED Status (using RGB LED Handler)
     bool sensorDataAvailable = pmSensor.readData(pm1_0_val, pm2_5_val, pm10_0_val, USE_MOCK_DATA);
@@ -134,7 +132,7 @@ void loop() {
             Serial.print("Data Read (Mock="); Serial.print(USE_MOCK_DATA ? "T" : "F");
             Serial.print("): PM2.5="); Serial.println(pm2_5_val);
 
-            // Read DHT22 data and display on OLED only if PM data is available
+            // Read DHT22 data
             float h = dhtSensor.readHumidity();
             float t = dhtSensor.readTemperature();
             String wifiStatusStr = wifiHandler.getWifiStatus();
@@ -142,8 +140,10 @@ void loop() {
             // Always attempt to display PM data, and DHT data if available
             oledDisplay.displaySensorDataAndWifiStatus(wifiStatusStr, pm1_0_val, pm2_5_val, pm10_0_val, h, t);
 
-            if (_blynkAndOtaInitialized && currentlyConnected) {
-                blynkHandler.sendData(pm1_0_val, pm2_5_val, pm10_0_val, t, h);
+            if (_otaInitialized && currentlyConnected) {
+                // *** UPDATED TO USE BLYNK HTTP API BATCH UPDATE ***
+                // Pass the AUTH TOKEN as the first parameter
+                blynkHandler.sendData(BLYNK_AUTH_TOKEN, pm1_0_val, pm2_5_val, pm10_0_val, t, h);
             }
             
             if (!isnan(h) && !isnan(t)) {
@@ -169,10 +169,10 @@ void loop() {
 
         if (pinger.Ping(PING_TARGET)) {
             Serial.println("SUCCESS: Internet access confirmed!");
-            rgbLEDHandler.startBlink(RGBLEDHandler::STATUS_PING_SUCCESS); // New call
+            rgbLEDHandler.startBlink(RGBLEDHandler::STATUS_PING_SUCCESS);
         } else {
             Serial.println("FAILURE: Ping failed. Router or ISP connection issue.");
-            rgbLEDHandler.startBlink(RGBLEDHandler::STATUS_PING_FAILURE); // New call
+            rgbLEDHandler.startBlink(RGBLEDHandler::STATUS_PING_FAILURE);
         }
     }
 delay(100);
