@@ -93,7 +93,6 @@ void setup() {
     dhtSensor.setup();
     
     oledDisplay.printMessage("Hello", "Shubham!");
-    delay(1000);
 }
 
 void loop() {
