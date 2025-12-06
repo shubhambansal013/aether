@@ -162,5 +162,5 @@ void loop() {
             rgbLEDHandler.startBlink(RGBLEDHandler::STATUS_PING_FAILURE);
         }
     }
-    delay(100);
+    delay(500);
 }
