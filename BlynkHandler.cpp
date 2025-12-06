@@ -5,7 +5,7 @@
 #include <WiFiClient.h>
 
 // Define the Blynk server for the HTTP API (must match your cloud or local server)
-#define BLYNK_SERVER_HOST "blynk-cloud.com" 
+#define BLYNK_SERVER_HOST "blynk.cloud" 
 
 // Constructor (simplified)
 BlynkHandler::BlynkHandler() {
