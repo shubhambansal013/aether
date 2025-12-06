@@ -1,6 +1,5 @@
 #include <ESP8266WiFi.h>
 #include <WiFiManager.h>
-#include <Pinger.h>
 #include <EEPROM.h>
 #include "WiFiHandler.h"
 #include "ResetHandler.h"
@@ -47,7 +46,6 @@ const char* FIRMWARE_BIN_NAME = "firmware.bin";
 // --- Global Variables/Instances ---
 WiFiHandler wifiHandler;
 ResetHandler resetHandler(wifiHandler);
-Pinger pinger;
 PMSensor pmSensor(PM_SENSOR_RX_PIN, PM_SENSOR_TX_PIN);
 BlynkHandler blynkHandler;
 OTAHandler otaHandler(FIRMWARE_VERSION, GITHUB_REPO_USER, GITHUB_REPO_NAME, FIRMWARE_BIN_NAME);
@@ -150,20 +148,6 @@ void loop() {
         Serial.println(humStr);
     } else {
         Serial.println("DHT Sensor read failed.");
-    }
-
-    // 6. Run Ping Diagnostic (only if connected)
-    if (currentlyConnected && millis() - lastPingTime >= PING_INTERVAL_MS) {
-        lastPingTime = millis();
-        Serial.print("\n## Pinging Internet Target (8.8.8.8)... ");
-
-        if (pinger.Ping(PING_TARGET)) {
-            Serial.println("SUCCESS: Internet access confirmed!");
-            rgbLEDHandler.startBlink(RGBLEDHandler::STATUS_PING_SUCCESS);
-        } else {
-            Serial.println("FAILURE: Ping failed. Router or ISP connection issue.");
-            rgbLEDHandler.startBlink(RGBLEDHandler::STATUS_PING_FAILURE);
-        }
     }
     delay(LOOP_DELAY);
 }
