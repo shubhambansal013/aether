@@ -9,30 +9,35 @@
 
 // --- Public Methods ---
 
+// Revised WiFiHandler::startConnect() for guaranteed non-blocking operation
 void WiFiHandler::startConnect(unsigned long quickConnectTimeoutMs, unsigned long apModeTimeoutSec) {
     _quickConnectTimeoutMs = quickConnectTimeoutMs;
     _apModeTimeoutSec = apModeTimeoutSec;
-    _connectMode = IDLE; // Reset initial state
+    _connectMode = IDLE; 
 
-    // NOTE: These use the static callback functions defined below
     wifiManager.setSaveConfigCallback(saveConfigCallback);
     wifiManager.setAPCallback(configModeCallback);
-    
-    // Set the connect timeout for STA mode attempts (used by WiFiManager internally)
-    wifiManager.setConnectTimeout(_quickConnectTimeoutMs); 
+    wifiManager.setConnectTimeout(_quickConnectTimeoutMs);  
 
-    // Always start in STA mode and call WiFi.begin() to load saved credentials if any
+    // Check if credentials exist in EEPROM before starting anything
     WiFi.mode(WIFI_STA);
     WiFi.begin(); 
 
-    // Check if credentials were loaded (WiFi.SSID() will be empty if not)
     if (WiFi.SSID().length() == 0) {
-        // Case #1: No saved config. Go straight to non-blocking AP mode.
-        Serial.println("Case #1: No saved config. Starting Config AP...");
-        // This initiates the AP creation
+        // Case #1: No saved config. Start non-blocking AP portal immediately.
+        Serial.println("Case #1: No saved config. Starting Config AP (Non-Blocking Fallback)...");
+        
+        // This is the correct sequence for non-blocking AP mode:
+        // 1. Switch mode
+        WiFi.mode(WIFI_AP_STA); 
+        
+        // 2. Call the function that sets up the AP and returns immediately
+        // The actual loop handling is done by wifiManager.process() in handleConnect()
         wifiManager.startConfigPortal("airmon_AP", "password"); 
+        
         _connectMode = AP_CONFIG_PORTAL;
         _apModeStartTime = millis();
+        
     } else {
         // Case #2: Saved config exists. Attempt quick connect.
         Serial.print("Attempting quick connect with saved credentials (");
@@ -41,6 +46,8 @@ void WiFiHandler::startConnect(unsigned long quickConnectTimeoutMs, unsigned lon
 
         _connectStartTime = millis();
         _connectMode = STA_CONNECTING;
+        
+        // The actual connection attempt has already begun with the WiFi.begin() call above.
     }
 }
 
