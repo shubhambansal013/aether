@@ -1,21 +1,27 @@
 // BlynkHandler.h
+
 #ifndef BLYNK_HANDLER_H
 #define BLYNK_HANDLER_H
 
-#include "blynk_config.h"
+#include <Arduino.h>
 
-// Forward declaration
-class BlynkTimer;
+// Forward declarations for libraries used in the .cpp file
+#include <ESP8266WiFi.h>
 
 class BlynkHandler {
 public:
-    BlynkHandler(); // Constructor
-    void begin(const char* auth, const char* ssid, const char* pass);
+    BlynkHandler();
+    // Updated 'begin' takes only WiFi credentials
+    void begin(const char* ssid, const char* pass);
+    
+    // 'run' is simplified since we no longer maintain a constant Blynk connection
     void run();
-    void sendData(float pm1_0, float pm2_5, float pm10_0, float temperature, float humidity);
 
+    // Updated 'sendData' now requires the Blynk Auth Token
+    void sendData(const char* auth, float pm1_0, float pm2_5, float pm10_0, float temperature, float humidity);
+    
 private:
-    BlynkTimer* _timer; // Pointer to the timer
+    // No longer need BlynkTimer or Blynk object for HTTP method.
 };
 
 #endif // BLYNK_HANDLER_H
