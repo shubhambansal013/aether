@@ -45,7 +45,7 @@ const char* FIRMWARE_BIN_NAME = "firmware.bin";
 WiFiHandler wifiHandler;
 ResetHandler resetHandler(wifiHandler);
 Pinger pinger;
-PMSensor pmSensor(SENSOR_RX_PIN, SENSOR_TX_PIN);
+PMSensor pmSensor(PM_SENSOR_RX_PIN, PM_SENSOR_TX_PIN);
 BlynkHandler blynkHandler;
 OTAHandler otaHandler(FIRMWARE_VERSION, GITHUB_REPO_USER, GITHUB_REPO_NAME, FIRMWARE_BIN_NAME);
 DHTSensor dhtSensor;
