@@ -3,6 +3,10 @@
 #include "WiFiHandler.h"
 #include <ESP8266WiFi.h>
 
+// Assuming WiFiHandler.h defines the enum:
+// enum ConnectionMode { IDLE, STA_CONNECTING, AP_CONFIG_PORTAL };
+// and includes WiFiManager wifiManager;
+
 // --- Public Methods ---
 
 void WiFiHandler::startConnect(unsigned long quickConnectTimeoutMs, unsigned long apModeTimeoutSec) {
@@ -25,7 +29,8 @@ void WiFiHandler::startConnect(unsigned long quickConnectTimeoutMs, unsigned lon
     if (WiFi.SSID().length() == 0) {
         // Case #1: No saved config. Go straight to non-blocking AP mode.
         Serial.println("Case #1: No saved config. Starting Config AP...");
-        wifiManager.startConfigPortal("airmon_AP", "password");
+        // This initiates the AP creation
+        wifiManager.startConfigPortal("airmon_AP", "password"); 
         _connectMode = AP_CONFIG_PORTAL;
         _apModeStartTime = millis();
     } else {
@@ -40,8 +45,8 @@ void WiFiHandler::startConnect(unsigned long quickConnectTimeoutMs, unsigned lon
 }
 
 bool WiFiHandler::handleConnect() {
-    // If already connected, just return true.
-    if (WiFi.status() == WL_CONNECTED) {
+    // 1. Check for a successful STA connection (not AP mode)
+    if (WiFi.status() == WL_CONNECTED && WiFi.getMode() == WIFI_STA) {
         if (_connectMode != IDLE) {
             Serial.println("\nSUCCESS! Wi-Fi Connected.");
             _connectMode = IDLE; // Transition to IDLE once connected
@@ -49,24 +54,28 @@ bool WiFiHandler::handleConnect() {
         return true;
     }
 
-    // Handle different connection modes
+    // 2. Handle different connection modes
     switch (_connectMode) {
         case STA_CONNECTING:
             if ((millis() - _connectStartTime) < _quickConnectTimeoutMs) {
                 // Still within STA quick connect timeout, keep trying
-                return false;
+                return false; 
             } else {
                 // STA quick connect timed out, fallback to AP mode
                 Serial.println("\nSTA quick connect timed out. Starting Config AP fallback.");
                 WiFi.disconnect(); // Disconnect STA to cleanly start AP
-                WiFi.mode(WIFI_AP_STA); // Switch to AP_STA mode for config portal
+                
+                // Switch to AP_STA mode for config portal
+                WiFi.mode(WIFI_AP_STA); 
                 wifiManager.startConfigPortal("airmon_AP", "password");
+                
                 _connectMode = AP_CONFIG_PORTAL;
                 _apModeStartTime = millis();
                 return false; // Not connected yet, AP mode initiated.
             }
         case AP_CONFIG_PORTAL:
-            wifiManager.process(); // Keep the config portal running
+            // CRITICAL: Keep the config portal running every loop cycle
+            wifiManager.process(); 
 
             if ((millis() - _apModeStartTime) < _apModeTimeoutSec * 1000UL) {
                 // Still within AP mode timeout
@@ -74,12 +83,15 @@ bool WiFiHandler::handleConnect() {
             } else {
                 // AP mode timed out, connection failed through portal
                 Serial.println("\nAP Configuration Portal timed out. Connection failed.");
-                _connectMode = IDLE; // No longer actively trying to connect via AP
-                // Optionally, trigger a reboot or further action in main loop
+                
+                // Switch back to STA mode, but disconnected, and stop trying.
+                WiFi.mode(WIFI_STA); 
+                _connectMode = IDLE; 
                 return false;
             }
         case IDLE:
-            // If in IDLE and not connected, something went wrong or waiting for startConnect.
+            // If in IDLE and not connected (WiFi.status() != WL_CONNECTED),
+            // we are simply waiting for startConnect to be called again, or we failed/timed out previously.
             return false;
     }
     return false; // Should not be reached
@@ -87,7 +99,8 @@ bool WiFiHandler::handleConnect() {
 
 
 String WiFiHandler::getWifiStatus() {
-    if (WiFi.status() == WL_CONNECTED) {
+    // Check if connected as a Station (client)
+    if (WiFi.status() == WL_CONNECTED && WiFi.getMode() == WIFI_STA) {
         return "Connected";
     }
 
@@ -97,9 +110,10 @@ String WiFiHandler::getWifiStatus() {
         case STA_CONNECTING:
             return "Connecting...";
         case AP_CONFIG_PORTAL:
-            return "AP Config";
+            // This is the status for the display when the AP is active
+            return "AP Config"; 
     }
-    return "Unknown"; // Should not be reached
+    return "Unknown"; 
 }
 
 void WiFiHandler::resetSettings() {
