@@ -124,7 +124,7 @@ bool PMSensor::readPmsData() {
 
 
 // Function to read and process the sensor data packet
-bool readSensorPacket() {
+bool PMSensor::readSensorPacket() {
   // 1. Synchronize: Wait for the two-byte START_SEQUENCE (0x42 0x4D)
   Serial.print("Sensor available: "); Serial.println(_pmSerial.available());
   while (_pmSerial.available()) {
@@ -132,7 +132,7 @@ bool readSensorPacket() {
 
     if (incomingByte == START_BYTE_1) {
       Serial.println("Found the first start byte. Check if the second byte is available and correct.");
-      if (mpmSensor.available() < (PACKET_SIZE - 1)) {
+      if (_pmSerial.available() < (PACKET_SIZE - 1)) {
         Serial.println("Not enough data immediately available, wait a moment");
         delay(5);
         if (_pmSerial.available() < (PACKET_SIZE - 1)) {
@@ -141,7 +141,7 @@ bool readSensorPacket() {
         }
       }
 
-      if (mpmSensor.peek() == START_BYTE_2) {
+      if (_pmSerial.peek() == START_BYTE_2) {
         // --- Synchronization Found ---
         
         // Read the second start byte immediately
