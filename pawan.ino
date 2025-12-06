@@ -126,7 +126,7 @@ void loop() {
     // Always attempt to display PM data, and DHT data if available
     oledDisplay.displaySensorDataAndWifiStatus(wifiStatusStr, pm1_0_val, pm2_5_val, pm10_0_val, h, t);
 
-    if (millis() - lastSendTime > BLYNK_SEND_INTERVAL_MS && _otaInitialized && currentlyConnected) {
+    if (sensorDataAvailable && millis() - lastSendTime > BLYNK_SEND_INTERVAL_MS && _otaInitialized && currentlyConnected) {
         // *** UPDATED TO USE BLYNK HTTP API BATCH UPDATE ***
         // Pass the AUTH TOKEN as the first parameter
         blynkHandler.sendData(BLYNK_AUTH_TOKEN, pm1_0_val, pm2_5_val, pm10_0_val, t, h);
