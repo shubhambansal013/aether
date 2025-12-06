@@ -21,7 +21,7 @@ const int WIFI_FAIL_REBOOT_DELAY_MS = 3000;
 const int SETUP_DELAY_MS = 100;
 
 // --- Wi-Fi Connection Constants ---
-const unsigned long QUICK_CONNECT_TIMEOUT_MS = 180000;
+const unsigned long QUICK_CONNECT_TIMEOUT_MS = 90000;
 const int CONFIG_AP_TIMEOUT_SEC = 600;
 
 // --- LED/Diagnostic Constants ---
