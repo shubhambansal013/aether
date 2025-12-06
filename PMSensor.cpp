@@ -40,6 +40,7 @@ void PMSensor::generateMockData(float& pm1_0, float& pm2_5, float& pm10_0) {
 
 bool PMSensor::readPmsData() {
     // 1. Synchronize: Wait for the two-byte START_SEQUENCE (0x42 0x4D)
+    Serial.print("PMSensor available: "); Serial.println(_pmSerial.available());
     while (_pmSerial.available()) {
         byte incomingByte = _pmSerial.read();
 
