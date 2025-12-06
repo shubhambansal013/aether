@@ -132,7 +132,7 @@ void loop() {
     oledDisplay.displaySensorDataAndWifiStatus(wifiStatusStr, pm1_0_val, pm2_5_val, pm10_0_val, h, t);
 
     if (millis() - lastSendTime > BLYNK_SEND_INTERVAL_MS) {
-        if (sensorDataAvailable && && _otaInitialized && currentlyConnected) {
+        if (sensorDataAvailable && _otaInitialized && currentlyConnected) {
             // *** BLYNK UPDATE ***
             blynkHandler.sendData(BLYNK_AUTH_TOKEN, pm1_0_val, pm2_5_val, pm10_0_val, t, h);
             lastSendTime = millis();
