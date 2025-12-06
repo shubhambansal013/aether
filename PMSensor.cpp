@@ -45,12 +45,12 @@ bool PMSensor::readPmsData() {
         byte incomingByte = _pmSerial.read();
 
         if (incomingByte == 0x42) { // START_BYTE_1
-            // Found the first start byte. Check if the second byte is available and correct.
+            Serial.println("Found the first start byte. Check if the second byte is available and correct.");
             if (_pmSerial.available() < 31) { // PACKET_SIZE - 1
-                // Not enough data immediately available, wait a moment
+                Serial.println("Not enough data immediately available, wait a moment");
                 delay(5);
                 if (_pmSerial.available() < 31) {
-                    // If still not enough, assume misalignment and discard this byte
+                    Serial.println("If still not enough, assume misalignment and discard this byte");
                     continue; 
                 }
             }
