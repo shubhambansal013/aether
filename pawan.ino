@@ -113,50 +113,40 @@ void loop() {
         otaHandler.handleArduinoOTA();
     }
 
-    // 3. Run Blynk (REMOVED - BlynkHandler::run() is not needed for HTTP API)
-    // if (_otaInitialized && currentlyConnected) {
-    //     blynkHandler.run();
-    // }
-
     // 4. Update LED Status (using RGB LED Handler)
     bool sensorDataAvailable = pmSensor.readData(pm1_0_val, pm2_5_val, pm10_0_val, USE_MOCK_DATA);
+    // Read DHT22 data
+    float h = dhtSensor.readHumidity();
+    float t = dhtSensor.readTemperature();
+
+    String wifiStatusStr = wifiHandler.getWifiStatus();
+    
     rgbLEDHandler.updateLED(currentlyConnected, pm2_5_val, sensorDataAvailable);
 
+    // Always attempt to display PM data, and DHT data if available
+    oledDisplay.displaySensorDataAndWifiStatus(wifiStatusStr, pm1_0_val, pm2_5_val, pm10_0_val, h, t);
 
-    // 5. Run Sensor and Blynk Update Timer
-    if (millis() - lastSendTime > BLYNK_SEND_INTERVAL_MS) {
-        if (sensorDataAvailable) {
-            Serial.print("Data Read (Mock="); Serial.print(USE_MOCK_DATA ? "T" : "F");
-            Serial.print("): PM2.5="); Serial.println(pm2_5_val);
-
-            // Read DHT22 data
-            float h = dhtSensor.readHumidity();
-            float t = dhtSensor.readTemperature();
-            String wifiStatusStr = wifiHandler.getWifiStatus();
-
-            // Always attempt to display PM data, and DHT data if available
-            oledDisplay.displaySensorDataAndWifiStatus(wifiStatusStr, pm1_0_val, pm2_5_val, pm10_0_val, h, t);
-
-            if (_otaInitialized && currentlyConnected) {
-                // *** UPDATED TO USE BLYNK HTTP API BATCH UPDATE ***
-                // Pass the AUTH TOKEN as the first parameter
-                blynkHandler.sendData(BLYNK_AUTH_TOKEN, pm1_0_val, pm2_5_val, pm10_0_val, t, h);
-            }
-            
-            if (!isnan(h) && !isnan(t)) {
-                String tempStr = "T: " + String(t, 1) + "C";
-                String humStr = "H: " + String(h, 0) + "%";
-                
-                Serial.println(tempStr);
-                Serial.println(humStr);
-            } else {
-                Serial.println("DHT Sensor read failed.");
-            }
-        } else {
-            Serial.println("Sensor read failed (if not mocking).");
-        }
-
+    if (millis() - lastSendTime > BLYNK_SEND_INTERVAL_MS && _otaInitialized && currentlyConnected) {
+        // *** UPDATED TO USE BLYNK HTTP API BATCH UPDATE ***
+        // Pass the AUTH TOKEN as the first parameter
+        blynkHandler.sendData(BLYNK_AUTH_TOKEN, pm1_0_val, pm2_5_val, pm10_0_val, t, h);
         lastSendTime = millis();
+    }
+    if (sensorDataAvailable) {
+        Serial.print("Data Read (Mock="); Serial.print(USE_MOCK_DATA ? "T" : "F");
+        Serial.print("): PM2.5="); Serial.println(pm2_5_val);
+    } else {
+        Serial.println("PM sensor data not available.");
+    }
+        
+    if (!isnan(h) && !isnan(t)) {
+        String tempStr = "T: " + String(t, 1) + "C";
+        String humStr = "H: " + String(h, 0) + "%";
+        
+        Serial.println(tempStr);
+        Serial.println(humStr);
+    } else {
+        Serial.println("DHT Sensor read failed.");
     }
 
     // 6. Run Ping Diagnostic (only if connected)
@@ -172,5 +162,5 @@ void loop() {
             rgbLEDHandler.startBlink(RGBLEDHandler::STATUS_PING_FAILURE);
         }
     }
-delay(100);
+    delay(100);
 }
