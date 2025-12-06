@@ -20,12 +20,9 @@ void OLEDDisplay::setup() {
     Serial.println("OLEDDisplay: display.begin() successful.");
 
     display.clearDisplay();
-    
-    // Set default text properties
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE); 
     display.setCursor(0,0);
-    
     display.println("OLED Initialized!");
     display.display();
     
@@ -70,41 +67,40 @@ void OLEDDisplay::printMessage(String line1, String line2, String line3) {
     display.display();
 }
 
-// ⭐ NEW: Private helper function to draw the Wi-Fi icon
+// ⭐ REVISED: Private helper function to draw a clear, 3-bar vertical Wi-Fi icon
 void OLEDDisplay::drawWifiIcon(int16_t x, int16_t y, String status) {
-    // Icon dimensions: 12 pixels wide, 8 pixels high
+    // Icon size: 8 pixels wide, 8 pixels high
+    int barWidth = 2;
+    int spacing = 1;
     
-    // Draw base arc (outermost bar, always present)
-    display.drawPixel(x + 6, y + 8, SSD1306_WHITE); // Center point
-    display.drawFastHLine(x + 3, y + 7, 6, SSD1306_WHITE);
-    display.drawPixel(x + 2, y + 6, SSD1306_WHITE);
-    display.drawPixel(x + 9, y + 6, SSD1306_WHITE);
+    // Bar 1 (Smallest - lowest signal)
+    display.drawRect(x, y + 5, barWidth, 3, SSD1306_WHITE);
+
+    if (status == "Connected" || status == "AP Config" || status == "Connecting...") {
+        // Bar 2 (Medium)
+        display.drawRect(x + barWidth + spacing, y + 3, barWidth, 5, SSD1306_WHITE);
+        
+        if (status == "Connected") {
+            // Bar 3 (Largest - full signal)
+            display.drawRect(x + 2 * (barWidth + spacing), y + 0, barWidth, 8, SSD1306_WHITE);
+        }
+    }
     
-    // Draw status-specific overlay
-    if (status == "Connected") {
-        // Full signal (draw inner bars)
-        display.drawFastHLine(x + 4, y + 5, 4, SSD1306_WHITE); // middle bar
-        display.drawPixel(x + 3, y + 4, SSD1306_WHITE);
-        display.drawPixel(x + 8, y + 4, SSD1306_WHITE);
-        display.drawPixel(x + 5, y + 3, SSD1306_WHITE); // inner bar
-        display.drawPixel(x + 6, y + 3, SSD1306_WHITE);
-        display.drawPixel(x + 6, y + 2, SSD1306_WHITE); // dot
-    } else if (status == "AP Config") {
-        // AP Mode / Setup Needed (Draw one bar and a setup indicator)
-        display.drawFastHLine(x + 4, y + 5, 4, SSD1306_WHITE);
-        display.drawRect(x + 8, y + 0, 4, 4, SSD1306_WHITE); // Box indicator
-    } else if (status == "Connecting...") {
-        // Connecting (Draw one bar only)
-        display.drawFastHLine(x + 4, y + 5, 4, SSD1306_WHITE);
-    } else { // Disconnected / Idle
-        // Draw an 'X' over the icon
-        display.drawLine(x, y, x + 12, y + 8, SSD1306_WHITE);
-        display.drawLine(x + 12, y, x, y + 8, SSD1306_WHITE);
+    if (status == "AP Config") {
+        // Draw a small dot or asterisk below the icon to denote AP mode
+        display.drawPixel(x + 4, y + 10, SSD1306_WHITE);
+    }
+    
+    if (status == "Idle/Disconnected" || status == "Unknown") {
+        // Clear all but bar 1 and draw an X over the whole area
+        display.fillRect(x + barWidth + spacing, y, 2 * (barWidth + spacing) + barWidth, 8, SSD1306_BLACK);
+        display.drawLine(x, y, x + 8, y + 8, SSD1306_WHITE);
+        display.drawLine(x + 8, y, x, y + 8, SSD1306_WHITE);
     }
 }
 
 
-// ⭐ REVISED: Main display function with new UI layout
+// ⭐ REVISED: Main display function with improved layout and font sizes
 void OLEDDisplay::displaySensorDataAndWifiStatus(String wifiStatus, float pm1_0, float pm2_5, float pm10_0, float humidity, float temperature) {
     display.clearDisplay();
     display.setTextColor(SSD1306_WHITE);
@@ -113,78 +109,84 @@ void OLEDDisplay::displaySensorDataAndWifiStatus(String wifiStatus, float pm1_0,
     // 💡 TOP HEADER ROW (Status & Wi-Fi Icon)
     // ------------------------------------------------------------------
     
-    // A. Draw Wi-Fi Icon (top right corner, 12x8)
-    drawWifiIcon(SCREEN_WIDTH - 12, 0, wifiStatus);
+    // A. Draw Wi-Fi Icon (Top Right Corner)
+    // Icon is 8x8, placing it at X=120, Y=0 (128 - 8)
+    drawWifiIcon(SCREEN_WIDTH - 8, 0, wifiStatus);
     
     // B. Display Wi-Fi Status Text (Top Left)
     display.setTextSize(1);
     display.setCursor(0, 0);
+    
+    // Truncate/rename status to fit beside the icon (128 - 10 pixels for icon/padding)
+    String status_display;
     if (wifiStatus == "AP Config") {
-         display.print("SETUP AP"); 
+         status_display = "SETUP AP"; 
+    } else if (wifiStatus == "Connecting...") {
+         status_display = "CONNECTING";
+    } else if (wifiStatus == "Idle/Disconnected") {
+         status_display = "DISCONNECTED";
     } else {
-         // Truncate long status strings to fit beside the icon
-         if (wifiStatus.length() > 14) {
-             display.print(wifiStatus.substring(0, 11) + "...");
-         } else {
-             display.print(wifiStatus);
-         }
+         status_display = wifiStatus;
     }
+    display.print(status_display);
 
 
     // ------------------------------------------------------------------
-    // 💡 PM2.5 FOCUS (Center Row - Largest Font)
+    // 💡 PM2.5 FOCUS (Large, Clear Font)
     // ------------------------------------------------------------------
-    display.setTextSize(3); // Largest font for main reading
-    display.setCursor(0, 14); 
+    
+    // ⚠️ FIX: Reduced font size to 2 to prevent merging with surrounding text
+    display.setTextSize(2); 
+    display.setCursor(0, 15); 
     
     // Left side: Label
     display.print("PM2.5");
     
-    // Right side: Value (Right-aligned using screen width)
+    // Right side: Value
     String pm2_5_str = String(pm2_5, 0);
     int16_t x1, y1;
     uint16_t w1, h1;
     display.getTextBounds(pm2_5_str, 0, 0, &x1, &y1, &w1, &h1); // Calculate width
     
-    // Set cursor to display value aligned to the right edge
-    display.setCursor(SCREEN_WIDTH - w1, 14);
+    // Place value right-aligned at X=128
+    display.setCursor(SCREEN_WIDTH - w1, 15);
     display.println(pm2_5_str);
 
+    // Draw a dividing line
+    display.drawFastHLine(0, 36, SCREEN_WIDTH, SSD1306_WHITE);
+
 
     // ------------------------------------------------------------------
-    // 💡 Secondary PM Values (Mid-Lower Row)
+    // 💡 Secondary PM and DHT Data (Bottom Half - Two Rows)
     // ------------------------------------------------------------------
     display.setTextSize(1);
+    
+    // ROW 1: PM1.0 & PM10.0 (Starting at Y=40)
     display.setCursor(0, 40); 
-    if (pm2_5 >= 0) { // Check if PM data is valid
+    if (pm2_5 >= 0) {
         // Left side: PM1.0
-        display.print("PM1: ");
+        display.print("PM1:");
         display.print(String(pm1_0, 0));
         
-        // Right side: PM10.0 (Starting at the middle of the screen)
+        // Right side: PM10.0 (Starting at the middle of the screen X=64)
         display.setCursor(64, 40); 
-        display.print("PM10: ");
+        display.print("PM10:");
         display.println(String(pm10_0, 0));
     } else {
         display.println("PM Sensor Fail");
     }
 
-
-    // ------------------------------------------------------------------
-    // 💡 DHT Data (Bottom Row)
-    // ------------------------------------------------------------------
-    display.setCursor(0, 54); // Last row
-    display.setTextSize(1);
-    
+    // ROW 2: DHT Data (Starting at Y=54)
+    display.setCursor(0, 54); 
     if (!isnan(humidity) && !isnan(temperature)) {
         // Left side: Temperature (T)
-        display.print("T: ");
+        display.print("T:");
         display.print(String(temperature, 1));
         display.print("C");
         
         // Right side: Humidity (H)
         display.setCursor(64, 54); 
-        display.print("H: ");
+        display.print("H:");
         display.print(String(humidity, 0));
         display.println("%");
     } else {
