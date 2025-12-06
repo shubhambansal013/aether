@@ -98,8 +98,10 @@ void setup() {
 
 void loop() {
     // 1. Handle Wi-Fi Connection State
-    bool currentlyConnected = (WiFi.status() == WL_CONNECTED);
     wifiHandler.handleConnect();
+
+    // Determine connection status based on Station (client) mode only
+    bool currentlyConnected = (WiFi.status() == WL_CONNECTED && WiFi.getMode() == WIFI_STA);
 
     // Initialize OTA once WiFi is connected
     if (currentlyConnected && !_otaInitialized) {
@@ -114,7 +116,7 @@ void loop() {
         otaHandler.handleArduinoOTA();
     }
 
-    // 4. Update LED Status (using RGB LED Handler)
+    // 4. Update LED Status
     bool sensorDataAvailable = pmSensor.readData(pm1_0_val, pm2_5_val, pm10_0_val, USE_MOCK_DATA);
     // Read DHT22 data
     float h = dhtSensor.readHumidity();
@@ -125,6 +127,7 @@ void loop() {
     rgbLEDHandler.updateLED(currentlyConnected, pm2_5_val, sensorDataAvailable);
 
     // Always attempt to display PM data, and DHT data if available
+    // This will now correctly show "AP Config" if in AP mode.
     oledDisplay.displaySensorDataAndWifiStatus(wifiStatusStr, pm1_0_val, pm2_5_val, pm10_0_val, h, t);
 
     if (sensorDataAvailable && millis() - lastSendTime > BLYNK_SEND_INTERVAL_MS && _otaInitialized && currentlyConnected) {
