@@ -10,8 +10,8 @@ const int RGB_LED_GREEN_PIN = 0; // GPIO0 (D3)
 const int RGB_LED_BLUE_PIN = 13;  // GPIO13 (D7)
 
 // PM Sensor Pins
-const int SENSOR_RX_PIN = 12; //
-const int SENSOR_TX_PIN = 14; // GPIO 12 (D5)
+const int SENSOR_RX_PIN = 14; // GPIO 14 (D5)
+const int SENSOR_TX_PIN = -1; // 
 
 // OLED Display Pins (I2C)
 const int OLED_SDA_PIN = 4; // GPIO 4 (D2)
