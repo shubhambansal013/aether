@@ -38,6 +38,8 @@ private:
     pms5003data* _data;
 
     bool readPmsData();
+
+    bool readSensorPacket();
     
     // Generates random numbers for testing
     void generateMockData(float& pm1_0, float& pm2_5, float& pm10_0);
