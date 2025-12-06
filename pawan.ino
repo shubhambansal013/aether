@@ -110,7 +110,6 @@ void loop() {
         Serial.println("Wi-Fi connected successfully! Initializing Blynk and OTA...");
         otaHandler.setupArduinoOTA();
         blynkHandler.begin(BLYNK_AUTH_TOKEN, WiFi.SSID().c_str(), WiFi.psk().c_str());
-        blynkHandler.sendFirmwareVersion(FIRMWARE_VERSION);
         _blynkAndOtaInitialized = true;
     }
 
@@ -135,10 +134,6 @@ void loop() {
             Serial.print("Data Read (Mock="); Serial.print(USE_MOCK_DATA ? "T" : "F");
             Serial.print("): PM2.5="); Serial.println(pm2_5_val);
 
-            if (_blynkAndOtaInitialized && currentlyConnected) {
-                blynkHandler.sendSensorData(pm1_0_val, pm2_5_val, pm10_0_val);
-            }
-
             // Read DHT22 data and display on OLED only if PM data is available
             float h = dhtSensor.readHumidity();
             float t = dhtSensor.readTemperature();
@@ -147,16 +142,16 @@ void loop() {
             // Always attempt to display PM data, and DHT data if available
             oledDisplay.displaySensorDataAndWifiStatus(wifiStatusStr, pm1_0_val, pm2_5_val, pm10_0_val, h, t);
 
+            if (_blynkAndOtaInitialized && currentlyConnected) {
+                blynkHandler.sendData(pm1_0_val, pm2_5_val, pm10_0_val, t, h);
+            }
+            
             if (!isnan(h) && !isnan(t)) {
                 String tempStr = "T: " + String(t, 1) + "C";
                 String humStr = "H: " + String(h, 0) + "%";
                 
                 Serial.println(tempStr);
                 Serial.println(humStr);
-
-                if (_blynkAndOtaInitialized && currentlyConnected) {
-                    blynkHandler.sendTemperatureHumidity(t, h);
-                }
             } else {
                 Serial.println("DHT Sensor read failed.");
             }
