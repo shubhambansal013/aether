@@ -103,9 +103,6 @@ void loop() {
     // Initialize OTA once WiFi is connected
     if (currentlyConnected && !_otaInitialized) {
         Serial.println("Wi-Fi connected successfully! Initializing OTA...");
-        
-        // BLYNK HANDLER BEGIN IS NOW SIMPLIFIED TO JUST CONNECTING TO WIFI:
-        blynkHandler.begin(WiFi.SSID().c_str(), WiFi.psk().c_str()); 
 
         otaHandler.setupArduinoOTA();
         _otaInitialized = true;
