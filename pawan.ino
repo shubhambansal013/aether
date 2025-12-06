@@ -38,7 +38,7 @@ const bool USE_MOCK_DATA = false;
 
 // --- OTA Update Constants ---
 const char* GITHUB_REPO_USER = "shubhambansal013";
-const char* GITHUB_REPO_NAME = "airmon";
+const char* GITHUB_REPO_NAME = "pawan";
 const char* FIRMWARE_BIN_NAME = "firmware.bin"; 
 // ----------------------------------------------------------------------
 
