@@ -91,7 +91,7 @@ void setup() {
     // 7. Initialize DHT22 Sensor
     dhtSensor.setup();
     
-    oledDisplay.printMessage("System", "Ready!");
+    oledDisplay.printMessage("Hello!");
     delay(1000);
 }
 
