@@ -2,6 +2,11 @@
 
 #include "PMSensor.h"
 
+// PM Sensor Protocol Constants (Confirmed by data stream)
+const byte START_BYTE_1 = 0x42;
+const byte START_BYTE_2 = 0x4D;
+const byte PACKET_SIZE = 32; // Total bytes in the packet (2 start + 2 length + 26 data + 2 checksum)
+
 // Struct to hold PMS5003 data
 struct pms5003data {
     uint16_t framelen;
