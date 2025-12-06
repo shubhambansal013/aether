@@ -23,6 +23,9 @@ public:
 
 private:
     Adafruit_SSD1306 display;
+    
+    // ⭐ FIX: Add the declaration for the new private helper function
+    void drawWifiIcon(int16_t x, int16_t y, String status); 
 };
 
 #endif
