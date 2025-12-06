@@ -33,6 +33,9 @@ const long PING_INTERVAL_MS = 10000;
 const long SENSOR_BAUD_RATE = 9600;
 const unsigned long BLYNK_SEND_INTERVAL_MS = 1000L;
 const bool USE_MOCK_DATA = false;
+
+// --- Loop delay ---
+const long LOOP_DELAY = 1000;
 // ----------------------------------------------------------------------
 
 // --- OTA Update Constants ---
@@ -162,5 +165,5 @@ void loop() {
             rgbLEDHandler.startBlink(RGBLEDHandler::STATUS_PING_FAILURE);
         }
     }
-    delay(500);
+    delay(LOOP_DELAY);
 }
