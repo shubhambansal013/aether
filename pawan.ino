@@ -31,7 +31,7 @@ const long PING_INTERVAL_MS = 10000;
 
 // --- Sensor Constants ---
 const long SENSOR_BAUD_RATE = 9600;
-const unsigned long BLYNK_SEND_INTERVAL_MS = 2000L;
+const unsigned long BLYNK_SEND_INTERVAL_MS = 1000L;
 const bool USE_MOCK_DATA = false;
 // ----------------------------------------------------------------------
 
