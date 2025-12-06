@@ -60,7 +60,7 @@ float pm10_0_val;
 
 unsigned long lastPingTime = 0;
 unsigned long lastSendTime = 0;
-bool _otaInitialized = false; // Renamed to reflect change
+bool _otaInitialized = false; 
 
 // ----------------------------------------------------------------------
 // SETUP & LOOP
@@ -82,7 +82,7 @@ void setup() {
     // 2. Check for Power Cycle Reset (Must be run before Wi-Fi)
     resetHandler.checkPowerCycles();
 
-    // 3. Initialize Wi-Fi
+    // 3. Initialize Wi-Fi (STARTS NON-BLOCKING STA CONNECT ATTEMPT)
     oledDisplay.printMessage("WiFi", "Starting...");
     wifiHandler.startConnect(QUICK_CONNECT_TIMEOUT_MS, (unsigned long)CONFIG_AP_TIMEOUT_SEC);
 
@@ -92,11 +92,13 @@ void setup() {
     // 7. Initialize DHT22 Sensor
     dhtSensor.setup();
     
-    oledDisplay.printMessage("Hello", "Shubham!");
+    // ⚠️ CRITICAL FIX: REMOVE BLOCKING DELAY/MESSAGE HERE
+    // Execution must proceed directly to loop() for sensor data display.
 }
 
 void loop() {
     // 1. Handle Wi-Fi Connection State
+    // This is where the AP portal is initiated non-blocking if STA fails.
     wifiHandler.handleConnect();
 
     // Determine connection status based on Station (client) mode only
@@ -115,23 +117,22 @@ void loop() {
         otaHandler.handleArduinoOTA();
     }
 
-    // 4. Update LED Status
+    // 4. Read Sensor Data (Runs every loop regardless of WiFi status)
     bool sensorDataAvailable = pmSensor.readData(pm1_0_val, pm2_5_val, pm10_0_val, USE_MOCK_DATA);
     // Read DHT22 data
     float h = dhtSensor.readHumidity();
     float t = dhtSensor.readTemperature();
 
+    // 5. Update Statuses
     String wifiStatusStr = wifiHandler.getWifiStatus();
     
     rgbLEDHandler.updateLED(currentlyConnected, pm2_5_val, sensorDataAvailable);
 
     // Always attempt to display PM data, and DHT data if available
-    // This will now correctly show "AP Config" if in AP mode.
     oledDisplay.displaySensorDataAndWifiStatus(wifiStatusStr, pm1_0_val, pm2_5_val, pm10_0_val, h, t);
 
     if (sensorDataAvailable && millis() - lastSendTime > BLYNK_SEND_INTERVAL_MS && _otaInitialized && currentlyConnected) {
-        // *** UPDATED TO USE BLYNK HTTP API BATCH UPDATE ***
-        // Pass the AUTH TOKEN as the first parameter
+        // *** BLYNK UPDATE ***
         blynkHandler.sendData(BLYNK_AUTH_TOKEN, pm1_0_val, pm2_5_val, pm10_0_val, t, h);
         lastSendTime = millis();
     }
