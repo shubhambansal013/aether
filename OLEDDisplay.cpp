@@ -122,7 +122,7 @@ void OLEDDisplay::displaySensorDataAndWifiStatus(String wifiStatus, float pm1_0,
     if (wifiStatus == "AP Config") {
          status_display = "SETUP AP"; 
     } else if (wifiStatus == "Connecting...") {
-         status_display = "CONNECTING";
+         status_display = "CONNECTING...";
     } else if (wifiStatus == "Idle/Disconnected") {
          status_display = "DISCONNECTED";
     } else {
