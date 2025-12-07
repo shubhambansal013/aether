@@ -34,7 +34,7 @@ const unsigned long BLYNK_SEND_INTERVAL_MS = 60000L;
 const bool USE_MOCK_DATA = false;
 
 // --- Loop delay ---
-const long LOOP_DELAY = 1000;
+const long LOOP_DELAY = 2000;
 // ----------------------------------------------------------------------
 
 // --- OTA Update Constants ---
