@@ -15,6 +15,7 @@ public:
 
     /**
      * @brief Updates the LED color based only on PM2.5 level and sensor availability.
+     * This function is non-blocking and handles the smooth color transition.
      * @param pm2_5_val The measured PM2.5 concentration (ug/m3).
      * @param sensorDataAvailable True if PM sensor data is valid.
      */
@@ -31,8 +32,8 @@ private:
     unsigned long _transitionStartTime = 0;
     const unsigned long FADE_DURATION_MS = 1000; // 1 second transition time
 
-    // --- Constants for PWM and AQI Colors ---
-    static const int PWM_MAX = 1023; // Max value for analogWrite
+    // --- Constants for PWM and Color Extraction ---
+    static const int PWM_MAX = 1023; // Max value for analogWrite (10-bit)
     static const int RGB_MAX = 255;  // Max value for 8-bit color
     
     // Helper to extract 8-bit component from hex
@@ -40,28 +41,28 @@ private:
     int getG255(long hex) { return (int)((hex >> 8) & 0xFF); }
     int getB255(long hex) { return (int)(hex & 0xFF); }
     
-    // Core color setting methods
+    // --- Core Color Management ---
     void setImmediateHexColor(long hexColor);
     void startColorTransition(long newTargetColor);
     void processColorTransition();
     
-    // Helper to convert 8-bit RGB (0-255) to 10-bit PWM (0-1023)
+    // Helper to set color on pins
     int rgbToPwm(int color255);
-    void setRGBColor(int r, int g, int b); // Helper to set color from 0-255
+    void setRGBColor(int r, int g, int b); 
 
-    // AQI Logic
-    void setAqiColor(float pm2_5_val, bool sensorDataAvailable);
+    // --- AQI Logic ---
     long getAqiHexColor(float pm2_5_val, bool sensorDataAvailable);
+    void setAqiColor(float pm2_5_val, bool sensorDataAvailable);
 
 
-    // AQI Color Hex Codes (unchanged)
-    static const long COLOR_GOOD                = 0x00FF00;
-    static const long COLOR_MODERATE            = 0xFFFF00;
-    static const long COLOR_UNHEALTHY_SENSITIVE = 0xFF8000;
-    static const long COLOR_UNHEALTHY           = 0xFF0000;
-    static const long COLOR_VERY_UNHEALTHY      = 0x800080;
-    static const long COLOR_HAZARDOUS           = 0x80000A;
-    static const long COLOR_SENSOR_ERROR        = 0xFF00FF;
+    // AQI Color Hex Codes (based on EPA and prototype)
+    static const long COLOR_GOOD                = 0x00FF00;  // Green (0.0-12.0)
+    static const long COLOR_MODERATE            = 0xFFFF00;  // Yellow (12.1-35.4)
+    static const long COLOR_UNHEALTHY_SENSITIVE = 0xFF8000;  // Orange (35.5-55.4)
+    static const long COLOR_UNHEALTHY           = 0xFF0000;  // Red (55.5-150.4)
+    static const long COLOR_VERY_UNHEALTHY      = 0x800080;  // Purple (150.5-250.4)
+    static const long COLOR_HAZARDOUS           = 0x80000A;  // Maroon (250.5+)
+    static const long COLOR_SENSOR_ERROR        = 0xFF00FF;  // Magenta (Sensor read failure)
 };
 
 #endif // RGBLED_HANDLER_H
