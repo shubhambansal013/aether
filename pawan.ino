@@ -17,16 +17,11 @@
 // ----------------------------------------------------------------------
 const char* FIRMWARE_VERSION = "V1.0.10 - OLED Fix";
 const long DEBUG_BAUD_RATE = 115200;
-const int WIFI_FAIL_REBOOT_DELAY_MS = 3000;
 const int SETUP_DELAY_MS = 100;
 
 // --- Wi-Fi Connection Constants ---
-const unsigned long QUICK_CONNECT_TIMEOUT_MS = 180000;
-const int CONFIG_AP_TIMEOUT_SEC = 600;
-
-// --- LED/Diagnostic Constants ---
-const IPAddress PING_TARGET(8, 8, 8, 8);
-const long PING_INTERVAL_MS = 10000;
+// NOTE: QUICK_CONNECT_TIMEOUT_MS and CONFIG_AP_TIMEOUT_SEC are no longer used
+// as the WiFiHandler now implements indefinite connection/AP mode.
 
 // --- Sensor Constants ---
 const long SENSOR_BAUD_RATE = 9600;
@@ -37,7 +32,7 @@ const bool USE_MOCK_DATA = false;
 const long LOOP_DELAY = 1000;
 // ----------------------------------------------------------------------
 
-// --- OTA Update Constants ---
+// --- OTA Update Constants (Unchanged) ---
 const char* GITHUB_REPO_USER = "shubhambansal013";
 const char* GITHUB_REPO_NAME = "pawan";
 const char* FIRMWARE_BIN_NAME = "firmware.bin";
@@ -58,7 +53,6 @@ float pm1_0_val;
 float pm2_5_val;
 float pm10_0_val;
 
-unsigned long lastPingTime = 0;
 unsigned long lastSendTime = 0;
 bool _otaInitialized = false; 
 
@@ -82,48 +76,41 @@ void setup() {
     // 2. Check for Power Cycle Reset (Must be run before Wi-Fi)
     resetHandler.checkPowerCycles();
 
-    // 3. Initialize Wi-Fi (STARTS NON-BLOCKING STA CONNECT ATTEMPT)
+    // 3. Initialize Wi-Fi (STARTS NON-BLOCKING STA CONNECT/AP ATTEMPT)
     oledDisplay.printMessage("WiFi", "Starting...");
-    wifiHandler.startConnect(QUICK_CONNECT_TIMEOUT_MS, (unsigned long)CONFIG_AP_TIMEOUT_SEC);
+    // 🧹 UPDATE: Call simplified startConnect() without timeout parameters
+    wifiHandler.startConnect();
 
-    // 6. Initialize Sensor Mock/Serial
+    // 4. Initialize Sensor Mock/Serial
     pmSensor.begin(SENSOR_BAUD_RATE);
 
-    // 7. Initialize DHT22 Sensor
+    // 5. Initialize DHT22 Sensor
     dhtSensor.setup();
-    
-    // ⚠️ CRITICAL FIX: REMOVE BLOCKING DELAY/MESSAGE HERE
-    // Execution must proceed directly to loop() for sensor data display.
 }
 
 void loop() {
     // 1. Handle Wi-Fi Connection State
-    // This is where the AP portal is initiated non-blocking if STA fails.
     wifiHandler.handleConnect();
 
     // Determine connection status based on Station (client) mode only
     bool currentlyConnected = (WiFi.status() == WL_CONNECTED && WiFi.getMode() == WIFI_STA);
 
-    // Initialize OTA once WiFi is connected
+    // 2. OTA Initialization and Handling (Logic commented out, but structures kept)
     // if (currentlyConnected && !_otaInitialized) {
     //     Serial.println("Wi-Fi connected successfully! Initializing OTA...");
-    //
     //     otaHandler.setupArduinoOTA();
     //     _otaInitialized = true;
     // }
-
-    // 2. Handle ArduinoOTA events (only if initialized)
     // if (_otaInitialized) {
     //     otaHandler.handleArduinoOTA();
     // }
 
-    // 4. Read Sensor Data (Runs every loop regardless of WiFi status)
+    // 3. Read Sensor Data (Runs every loop regardless of WiFi status)
     bool sensorDataAvailable = pmSensor.readData(pm1_0_val, pm2_5_val, pm10_0_val, USE_MOCK_DATA);
-    // Read DHT22 data
     float h = dhtSensor.readHumidity();
     float t = dhtSensor.readTemperature();
 
-    // 5. Update Statuses
+    // 4. Update Statuses and Display
     String wifiStatusStr = wifiHandler.getWifiStatus();
     
     rgbLEDHandler.updateLED(currentlyConnected, pm2_5_val, sensorDataAvailable);
@@ -131,6 +118,7 @@ void loop() {
     // Always attempt to display PM data, and DHT data if available
     oledDisplay.displaySensorDataAndWifiStatus(wifiStatusStr, pm1_0_val, pm2_5_val, pm10_0_val, h, t);
 
+    // 5. Blynk Data Transmission
     if (millis() - lastSendTime > BLYNK_SEND_INTERVAL_MS) {
         if (sensorDataAvailable && currentlyConnected) {
             // *** BLYNK UPDATE ***
@@ -138,6 +126,8 @@ void loop() {
             lastSendTime = millis();
         }
     }
+    
+    // 6. Serial Debug Output
     if (sensorDataAvailable) {
         Serial.print("Data Read (Mock="); Serial.print(USE_MOCK_DATA ? "T" : "F");
         Serial.print("): PM2.5="); Serial.println(pm2_5_val);
@@ -148,11 +138,11 @@ void loop() {
     if (!isnan(h) && !isnan(t)) {
         String tempStr = "T: " + String(t, 1) + "C";
         String humStr = "H: " + String(h, 0) + "%";
-        
         Serial.println(tempStr);
         Serial.println(humStr);
     } else {
         Serial.println("DHT Sensor read failed.");
     }
+    
     delay(LOOP_DELAY);
 }
