@@ -9,17 +9,17 @@
 class WiFiHandler {
 public:
     enum WiFiConnectionMode {
-        IDLE,            // No connection attempt active, or connected
-        STA_CONNECTING,  // Attempting to connect to a saved AP
-        AP_CONFIG_PORTAL // Running configuration portal as an AP
+        IDLE,                // No connection attempt active, or connected
+        STA_CONNECTING,      // Attempting to connect to a saved AP (indefinitely)
+        AP_CONFIG_PORTAL     // Running configuration portal as an AP (indefinitely)
     };
 
     /**
-     * @brief Starts the Wi-Fi connection attempt in a non-blocking manner.
-     * @param quickConnectTimeoutMs Time for initial STA connection attempt.
-     * @param apModeTimeoutSec Time for configuration portal to stay active.
+     * @brief Starts the Wi-Fi connection process in a non-blocking manner.
+     * * If saved configuration exists, it attempts to connect indefinitely (STA_CONNECTING).
+     * If no configuration exists, it starts the Configuration AP indefinitely (AP_CONFIG_PORTAL).
      */
-    void startConnect(unsigned long quickConnectTimeoutMs, unsigned long apModeTimeoutSec);
+    void startConnect(); // Simplified signature, no timeouts needed
 
     /**
      * @brief Handles the ongoing Wi-Fi connection attempt. Should be called repeatedly in loop().
@@ -34,19 +34,23 @@ public:
     String getWifiStatus();
 
     /**
-     * @brief Clears saved Wi-Fi credentials. Used for the power-cycle reset logic.
+     * @brief Clears saved Wi-Fi credentials.
      */
     void resetSettings();
 
 private:
     WiFiManager wifiManager;
-    unsigned long _quickConnectTimeoutMs;
-    unsigned long _apModeTimeoutSec; // Renamed for clarity
-    unsigned long _connectStartTime;
     WiFiConnectionMode _connectMode = IDLE;
-    unsigned long _apModeStartTime; // To track duration of config portal
 
+    // --- Private Helper Methods (Match the new .cpp structure) ---
+    void setupWiFiManager();
+    void startConfigAP();
+    void startSTAConnect();
+    // Removed processAPTimeout() as AP mode is now indefinite when no config is present.
+
+    // --- Static Callbacks ---
     static void saveConfigCallback();
     static void configModeCallback(WiFiManager *myWiFiManager);
 };
-#endif
+
+#endif // WIFI_HANDLER_H

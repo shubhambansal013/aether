@@ -31,7 +31,7 @@ private:
     const int EEPROM_SIZE = 512;
 
     // Reset Logic Constants
-    const int MAX_BOOT_CYCLES = 5;
+    const int MAX_BOOT_CYCLES = 7;
     const unsigned long MAX_TIME_MS = 5000;
     const int RESET_DELAY_MS = 500;
 };
