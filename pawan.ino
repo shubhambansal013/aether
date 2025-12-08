@@ -34,7 +34,7 @@ const unsigned long BLYNK_SEND_INTERVAL_MS = 60000L;
 const bool USE_MOCK_DATA = false;
 
 // --- Loop delay ---
-const long LOOP_DELAY = 2000;
+const long LOOP_DELAY = 1000;
 // ----------------------------------------------------------------------
 
 // --- OTA Update Constants ---
@@ -105,17 +105,17 @@ void loop() {
     bool currentlyConnected = (WiFi.status() == WL_CONNECTED && WiFi.getMode() == WIFI_STA);
 
     // Initialize OTA once WiFi is connected
-    if (currentlyConnected && !_otaInitialized) {
-        Serial.println("Wi-Fi connected successfully! Initializing OTA...");
-
-        otaHandler.setupArduinoOTA();
-        _otaInitialized = true;
-    }
+    // if (currentlyConnected && !_otaInitialized) {
+    //     Serial.println("Wi-Fi connected successfully! Initializing OTA...");
+    //
+    //     otaHandler.setupArduinoOTA();
+    //     _otaInitialized = true;
+    // }
 
     // 2. Handle ArduinoOTA events (only if initialized)
-    if (_otaInitialized) {
-        otaHandler.handleArduinoOTA();
-    }
+    // if (_otaInitialized) {
+    //     otaHandler.handleArduinoOTA();
+    // }
 
     // 4. Read Sensor Data (Runs every loop regardless of WiFi status)
     bool sensorDataAvailable = pmSensor.readData(pm1_0_val, pm2_5_val, pm10_0_val, USE_MOCK_DATA);
