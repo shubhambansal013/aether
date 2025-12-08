@@ -63,8 +63,7 @@ void WiFiHandler::startSTAConnect() {
 
 // --- Public Methods ---
 
-void WiFiHandler::startConnect(unsigned long quickConnectTimeoutMs, unsigned long apModeTimeoutSec) {
-    // quickConnectTimeoutMs and apModeTimeoutSec are ignored in this logic.
+void WiFiHandler::startConnect() {
     _connectMode = IDLE;
 
     setupWiFiManager();
