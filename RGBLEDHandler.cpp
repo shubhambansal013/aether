@@ -7,11 +7,13 @@ RGBLEDHandler::RGBLEDHandler(int rPin, int gPin, int bPin)
 // --- Private Helper Method: PWM and Color Setting ---
 
 int RGBLEDHandler::rgbToPwm(int color255) {
+    // Convert 8-bit (0-255) to 10-bit (0-1023)
     return (int)round((float)color255 * ((float)PWM_MAX / (float)RGB_MAX));
 }
 
 void RGBLEDHandler::setRGBColor(int r, int g, int b) {
-    // Common Cathode: LOW = ON, HIGH = OFF (Using PWM_MAX - PWM)
+    // Set color on pins (Common Cathode: LOW = ON, HIGH = OFF)
+    // We use PWM_MAX - PWM to invert the signal for common cathode.
     analogWrite(_rPin, PWM_MAX - rgbToPwm(r));
     analogWrite(_gPin, PWM_MAX - rgbToPwm(g));
     analogWrite(_bPin, PWM_MAX - rgbToPwm(b));
@@ -32,7 +34,8 @@ void RGBLEDHandler::setImmediateHexColor(long hexColor) {
  */
 void RGBLEDHandler::startColorTransition(long newTargetColor) {
     if (_targetColorHex != newTargetColor) {
-        // The current color becomes the start of the next transition
+        // Only start a new transition if the target is different from the current target
+        // The current color state already holds the right start color (it might be mid-transition)
         _currentColorHex = (_transitionStartTime == 0) ? _targetColorHex : _currentColorHex;
         _targetColorHex = newTargetColor;
         _transitionStartTime = millis();
@@ -83,7 +86,7 @@ void RGBLEDHandler::processColorTransition() {
  */
 long RGBLEDHandler::getAqiHexColor(float pm2_5_val, bool sensorDataAvailable) {
     if (!sensorDataAvailable) {
-        return COLOR_SENSOR_ERROR; // Magenta for sensor error
+        return COLOR_SENSOR_ERROR;
     } 
     // US EPA PM2.5 24-hour breakpoints (ug/m3)
     else if (pm2_5_val >= 250.5) {
@@ -130,9 +133,10 @@ void RGBLEDHandler::startupSequence() {
     unsigned long sequenceStartTime = millis();
     while (millis() - sequenceStartTime < FADE_DURATION_MS) {
         processColorTransition();
-        // Allow other tasks to run (if this were in loop, but startup is blocking)
+        // Use a short delay in blocking functions to prevent watchdog timer trips on some platforms
+        delay(1); 
     }
-    setImmediateHexColor(colors[0]); // Ensure it hits the target
+    setImmediateHexColor(colors[0]);
 
     // 2. Fade through the rest of the colors
     for (size_t i = 1; i < sizeof(colors) / sizeof(colors[0]); ++i) {
@@ -141,8 +145,9 @@ void RGBLEDHandler::startupSequence() {
         // Blocking wait for transition to complete
         while (millis() - transitionStart < FADE_DURATION_MS) {
             processColorTransition();
+            delay(1); 
         }
-        setImmediateHexColor(colors[i]); // Ensure final color is set
+        setImmediateHexColor(colors[i]);
         delay(500); // Pause on color
     }
     
@@ -151,6 +156,7 @@ void RGBLEDHandler::startupSequence() {
     unsigned long fadeOutStart = millis();
     while (millis() - fadeOutStart < FADE_DURATION_MS) {
         processColorTransition();
+        delay(1); 
     }
     setImmediateHexColor(0x000000); 
     delay(500);
