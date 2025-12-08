@@ -12,11 +12,15 @@ int RGBLEDHandler::rgbToPwm(int color255) {
 }
 
 void RGBLEDHandler::setRGBColor(int r, int g, int b) {
-    // Set color on pins (Common Cathode: LOW = ON, HIGH = OFF)
-    // We use PWM_MAX - PWM to invert the signal for common cathode.
-    analogWrite(_rPin, PWM_MAX - rgbToPwm(r));
-    analogWrite(_gPin, PWM_MAX - rgbToPwm(g));
-    analogWrite(_bPin, PWM_MAX - rgbToPwm(b));
+    // *** BUG FIX: REMOVING PWM INVERSION ***
+    // We assume the hardware is wired as Common Anode (High = ON, Low = OFF) 
+    // OR that the PWM inversion is handled elsewhere if it's Common Cathode.
+    // Based on the user observation of "whitish" color, the previous inversion logic
+    // was likely causing the opposite of the desired color.
+    
+    analogWrite(_rPin, rgbToPwm(r)); 
+    analogWrite(_gPin, rgbToPwm(g)); 
+    analogWrite(_bPin, rgbToPwm(b)); 
 }
 
 /**
@@ -34,8 +38,6 @@ void RGBLEDHandler::setImmediateHexColor(long hexColor) {
  */
 void RGBLEDHandler::startColorTransition(long newTargetColor) {
     if (_targetColorHex != newTargetColor) {
-        // Only start a new transition if the target is different from the current target
-        // The current color state already holds the right start color (it might be mid-transition)
         _currentColorHex = (_transitionStartTime == 0) ? _targetColorHex : _currentColorHex;
         _targetColorHex = newTargetColor;
         _transitionStartTime = millis();
@@ -52,13 +54,11 @@ void RGBLEDHandler::processColorTransition() {
     float progress = (float)elapsedTime / FADE_DURATION_MS;
 
     if (progress >= 1.0) {
-        // Transition complete: Set final color and reset state
         setImmediateHexColor(_targetColorHex);
         return;
     }
 
     // --- Linear Interpolation (LERP) ---
-    // Color = Start + (Target - Start) * Progress
 
     // Red component
     int rStart = getR255(_currentColorHex);
@@ -123,47 +123,44 @@ void RGBLEDHandler::startupSequence() {
     Serial.println("Running RGB Startup Sequence (R -> G -> B fade)...");
     
     // Define the required sequence: Red, Green, Blue
-    // Note: Pure Blue (0x0000FF) is not in your AQI constants, so we define it here.
     const long STARTUP_COLORS[] = {
-        0xFF0000L, // Red (COLOR_UNHEALTHY)
-        0x00FF00L, // Green (COLOR_GOOD)
-        0x0000FFL  // Blue (Pure Blue)
+        0xFF0000L, // Red
+        0x00FF00L, // Green
+        0x0000FFL  // Blue
     };
     const size_t NUM_COLORS = sizeof(STARTUP_COLORS) / sizeof(STARTUP_COLORS[0]);
 
-
-    // 1. Fade in the first color (Red)
-    // startColorTransition(STARTUP_COLORS[0]);
-    // unsigned long sequenceStartTime = millis();
-    // while (millis() - sequenceStartTime < FADE_DURATION_MS) {
-    //     processColorTransition();
-    //     delay(1); 
-    // }
-    setImmediateHexColor(STARTUP_COLORS[0]);
-    delay(1000); // Pause on Red
-
-    // 2. Fade through the rest of the colors (Green, then Blue)
-    for (size_t i = 1; i < NUM_COLORS; ++i) {
-        // startColorTransition(STARTUP_COLORS[i]);
-        // unsigned long transitionStart = millis();
-        // Blocking wait for transition to complete
-        // while (millis() - transitionStart < FADE_DURATION_MS) {
-        //     processColorTransition();
-        //     delay(1); 
-        // }
-        setImmediateHexColor(STARTUP_COLORS[i]);
-        delay(1000); // Pause on Green/Blue
+    // 1. Start the sequence with an initial black color to ensure fade-in
+    long currentSequenceColor = 0x000000L;
+    
+    // 2. Iterate through all target colors, fading to each one
+    for (size_t i = 0; i < NUM_COLORS; ++i) {
+        // Start the transition from the previous color to the current target color
+        currentSequenceColor = STARTUP_COLORS[i];
+        startColorTransition(currentSequenceColor);
+        
+        unsigned long transitionStart = millis();
+        
+        // Blocking wait for the full transition time
+        while (millis() - transitionStart < FADE_DURATION_MS) {
+            processColorTransition();
+            delay(1); // Small delay to yield time and prevent watchdog
+        }
+        
+        // Ensure final color is set and wait for the display period
+        setImmediateHexColor(currentSequenceColor); 
+        delay(1000); // Pause on color for 1 second
     }
     
-    // // 3. Fade out to black
-    // startColorTransition(0x000000);
-    // unsigned long fadeOutStart = millis();
-    // while (millis() - fadeOutStart < FADE_DURATION_MS) {
-    //     processColorTransition();
-    //     delay(1); 
-    // }
+    // 3. Fade out to black
+    startColorTransition(0x000000);
+    unsigned long fadeOutStart = millis();
+    while (millis() - fadeOutStart < FADE_DURATION_MS) {
+        processColorTransition();
+        delay(1); 
+    }
     setImmediateHexColor(0x000000); 
-    delay(1000);
+    delay(500);
 }
 
 void RGBLEDHandler::updateLED(float pm2_5_val, bool sensorDataAvailable) {
