@@ -120,35 +120,39 @@ void RGBLEDHandler::setup() {
 }
 
 void RGBLEDHandler::startupSequence() {
-    Serial.println("Running RGB Startup Sequence...");
+    Serial.println("Running RGB Startup Sequence (R -> G -> B fade)...");
     
-    long colors[] = {
-        COLOR_GOOD, COLOR_MODERATE, COLOR_UNHEALTHY_SENSITIVE, 
-        COLOR_UNHEALTHY, COLOR_VERY_UNHEALTHY, COLOR_HAZARDOUS,
-        COLOR_SENSOR_ERROR
+    // Define the required sequence: Red, Green, Blue
+    // Note: Pure Blue (0x0000FF) is not in your AQI constants, so we define it here.
+    const long STARTUP_COLORS[] = {
+        0xFF0000L, // Red (COLOR_UNHEALTHY)
+        0x00FF00L, // Green (COLOR_GOOD)
+        0x0000FFL  // Blue (Pure Blue)
     };
+    const size_t NUM_COLORS = sizeof(STARTUP_COLORS) / sizeof(STARTUP_COLORS[0]);
 
-    // 1. Fade in the first color
-    startColorTransition(colors[0]);
+
+    // 1. Fade in the first color (Red)
+    startColorTransition(STARTUP_COLORS[0]);
     unsigned long sequenceStartTime = millis();
     while (millis() - sequenceStartTime < FADE_DURATION_MS) {
         processColorTransition();
-        // Use a short delay in blocking functions to prevent watchdog timer trips on some platforms
         delay(1); 
     }
-    setImmediateHexColor(colors[0]);
+    setImmediateHexColor(STARTUP_COLORS[0]);
+    delay(500); // Pause on Red
 
-    // 2. Fade through the rest of the colors
-    for (size_t i = 1; i < sizeof(colors) / sizeof(colors[0]); ++i) {
-        startColorTransition(colors[i]);
+    // 2. Fade through the rest of the colors (Green, then Blue)
+    for (size_t i = 1; i < NUM_COLORS; ++i) {
+        startColorTransition(STARTUP_COLORS[i]);
         unsigned long transitionStart = millis();
         // Blocking wait for transition to complete
         while (millis() - transitionStart < FADE_DURATION_MS) {
             processColorTransition();
             delay(1); 
         }
-        setImmediateHexColor(colors[i]);
-        delay(500); // Pause on color
+        setImmediateHexColor(STARTUP_COLORS[i]);
+        delay(500); // Pause on Green/Blue
     }
     
     // 3. Fade out to black
