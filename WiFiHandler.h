@@ -1,148 +1,56 @@
-// WiFiHandler.cpp
-#include "WiFiHandler.h"
-#include <ESP8266WiFi.h>
+// WiFiHandler.h
 
-// Define static IP configuration for the Soft AP
-const IPAddress AP_LOCAL_IP(192, 168, 4, 1);
-const IPAddress AP_GATEWAY(192, 168, 4, 1);
-const IPAddress AP_SUBNET(255, 255, 255, 0);
+#ifndef WIFI_HANDLER_H
+#define WIFI_HANDLER_H
 
-// --- Private Helper Methods ---
+#include <Arduino.h>
+#include <WiFiManager.h>
 
-/**
- * @brief Sets up WiFiManager callbacks and core WiFi settings.
- */
-void WiFiHandler::setupWiFiManager() {
-    wifiManager.setSaveConfigCallback(saveConfigCallback);
-    wifiManager.setAPCallback(configModeCallback);
-    
-    // Set internal connect timeout to 0 for infinite retries in STA mode
-    wifiManager.setConnectTimeout(0); 
+class WiFiHandler {
+public:
+    enum WiFiConnectionMode {
+        IDLE,                // No connection attempt active, or connected
+        STA_CONNECTING,      // Attempting to connect to a saved AP (indefinitely)
+        AP_CONFIG_PORTAL     // Running configuration portal as an AP (indefinitely)
+    };
 
-    // Initialize Wi-Fi in Station mode and load saved credentials
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(); 
-}
+    /**
+     * @brief Starts the Wi-Fi connection process in a non-blocking manner.
+     * * If saved configuration exists, it attempts to connect indefinitely (STA_CONNECTING).
+     * If no configuration exists, it starts the Configuration AP indefinitely (AP_CONFIG_PORTAL).
+     */
+    void startConnect(); // Simplified signature, no timeouts needed
 
-/**
- * @brief Starts the Configuration AP (Access Point) mode indefinitely.
- */
-void WiFiHandler::startConfigAP() {
-    Serial.println(">>> No saved credentials found. Starting Configuration AP (No Timeout).");
+    /**
+     * @brief Handles the ongoing Wi-Fi connection attempt. Should be called repeatedly in loop().
+     * @return true if connected successfully, false if still connecting or failed.
+     */
+    bool handleConnect();
 
-    // Configure the Soft AP IP settings for stability and DNS masking
-    WiFi.softAPConfig(AP_LOCAL_IP, AP_GATEWAY, AP_SUBNET);
-    
-    // Ensure clean reboot after config
-    wifiManager.setBreakAfterConfig(true); 
-    
-    // Start the non-blocking AP portal
-    // NOTE: Because there is no saved config, the AP mode should run indefinitely.
-    wifiManager.startConfigPortal("airmon_AP", "password"); 
-    
-    _connectMode = AP_CONFIG_PORTAL;
-    // _apModeStartTime is no longer needed since there is no timeout
-}
+    /**
+     * @brief Returns a string representation of the current WiFi status.
+     * @return A string indicating the WiFi status.
+     */
+    String getWifiStatus();
 
-/**
- * @brief Enters the infinite Station (STA) connection mode.
- */
-void WiFiHandler::startSTAConnect() {
-    Serial.print(">>> Saved config found. Connecting indefinitely to SSID: ");
-    Serial.println(WiFi.SSID());
+    /**
+     * @brief Clears saved Wi-Fi credentials.
+     */
+    void resetSettings();
 
-    // The ESP8266 Core handles all reconnection attempts in the background
-    _connectMode = STA_CONNECTING;
-}
+private:
+    WiFiManager wifiManager;
+    WiFiConnectionMode _connectMode = IDLE;
 
-/**
- * @brief Starts the AP with a timeout. Only called when falling back from STA mode.
- * Removed this method as the requirements dictate AP mode only starts when no config is saved,
- * and should then run indefinitely.
- */
+    // --- Private Helper Methods (Match the new .cpp structure) ---
+    void setupWiFiManager();
+    void startConfigAP();
+    void startSTAConnect();
+    // Removed processAPTimeout() as AP mode is now indefinite when no config is present.
 
-// --- Public Methods ---
+    // --- Static Callbacks ---
+    static void saveConfigCallback();
+    static void configModeCallback(WiFiManager *myWiFiManager);
+};
 
-void WiFiHandler::startConnect(unsigned long quickConnectTimeoutMs, unsigned long apModeTimeoutSec) {
-    // quickConnectTimeoutMs and apModeTimeoutSec are ignored in this logic.
-    _connectMode = IDLE;
-
-    setupWiFiManager();
-
-    // Decision Logic: AP or STA?
-    if (WiFi.SSID().length() == 0) {
-        // Case A: No saved config -> Start indefinite AP mode
-        startConfigAP();
-    } else {
-        // Case B: Saved config exists -> Start indefinite STA mode
-        startSTAConnect();
-    }
-}
-
-/**
- * @brief Must be called in the main loop() to check connection status and process AP mode.
- * @return true if Wi-Fi is successfully connected (WL_CONNECTED in WIFI_STA mode), false otherwise.
- */
-bool WiFiHandler::handleConnect() {
-    // 1. Connection Success Check (Exit Condition)
-    if (WiFi.status() == WL_CONNECTED && WiFi.getMode() == WIFI_STA) {
-        if (_connectMode != IDLE) {
-            Serial.println("\n--- SUCCESS! Wi-Fi Connected. ---");
-            _connectMode = IDLE; 
-        }
-        return true;
-    }
-
-    // 2. Mode Handling
-    switch (_connectMode) {
-        case STA_CONNECTING:
-            // Saved config exists. Waiting for ESP core to connect indefinitely.
-            return false;
-            
-        case AP_CONFIG_PORTAL:
-            // CRITICAL: Keep the configuration portal running. No timeout implemented here.
-            wifiManager.process(); 
-            return false; // Still in AP mode, not connected to the internet.
-        
-        case IDLE:
-            return false;
-    }
-    
-    return false;
-}
-
-// --- Status and Utility Methods ---
-
-String WiFiHandler::getWifiStatus() {
-    if (WiFi.status() == WL_CONNECTED && WiFi.getMode() == WIFI_STA) {
-        return "Connected";
-    }
-
-    switch (_connectMode) {
-        case IDLE:
-            return "Idle/Disconnected";
-        case STA_CONNECTING:
-            return "Connecting...";
-        case AP_CONFIG_PORTAL:
-            return "AP Config (Persistent)"; 
-    }
-    
-    return "Unknown Status"; 
-}
-
-void WiFiHandler::resetSettings() {
-    Serial.println("--- Clearing Wi-Fi credentials (Factory Reset). ---");
-    wifiManager.resetSettings();
-}
-
-// --- Private Static Callback Implementations ---
-
-void WiFiHandler::saveConfigCallback () {
-    Serial.println("Wi-Fi credentials saved to storage.");
-}
-
-void WiFiHandler::configModeCallback (WiFiManager *myWiFiManager) {
-    Serial.println("Entered Configuration Mode.");
-    Serial.print("Connect to AP 'airmon_AP' at IP: ");
-    Serial.println(WiFi.softAPIP());
-}
+#endif // WIFI_HANDLER_H
