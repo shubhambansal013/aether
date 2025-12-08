@@ -4,86 +4,83 @@
 RGBLEDHandler::RGBLEDHandler(int rPin, int gPin, int bPin)
     : _rPin(rPin), _gPin(gPin), _bPin(bPin) {}
 
+// --- Private Helper Method: Convert 8-bit RGB (0-255) to 10-bit PWM (0-1023) ---
+int RGBLEDHandler::rgbToPwm(int color255) {
+    return (int)round((float)color255 * ((float)PWM_MAX / (float)RGB_MAX));
+}
+
+// --- Private Helper Method: Apply 24-bit Hex color (0xRRGGBB) ---
+void RGBLEDHandler::hexToPwm(long hexColor) {
+    // 1. Extract 0-255 RGB components
+    int r255 = (int)((hexColor >> 16) & 0xFF);
+    int g255 = (int)((hexColor >> 8) & 0xFF);
+    int b255 = (int)(hexColor & 0xFF);
+
+    // 2. Write the values to the pins (Common Cathode: LOW = ON, HIGH = OFF)
+    analogWrite(_rPin, PWM_MAX - rgbToPwm(r255));
+    analogWrite(_gPin, PWM_MAX - rgbToPwm(g255));
+    analogWrite(_bPin, PWM_MAX - rgbToPwm(b255));
+}
+
+// --- Private Helper Method: Set color using 0-255 components ---
+void RGBLEDHandler::setRGBColor(int r, int g, int b) {
+    // Common Cathode: LOW = ON, HIGH = OFF (Using PWM_MAX - PWM)
+    analogWrite(_rPin, PWM_MAX - rgbToPwm(r));
+    analogWrite(_gPin, PWM_MAX - rgbToPwm(g));
+    analogWrite(_bPin, PWM_MAX - rgbToPwm(b));
+}
+
+// --- Private Helper Method: AQI Color Mapping ---
+void RGBLEDHandler::setAqiColor(float pm2_5_val, bool sensorDataAvailable) {
+    if (!sensorDataAvailable) {
+        hexToPwm(COLOR_SENSOR_ERROR); // Magenta for sensor error
+    } 
+    // US EPA PM2.5 24-hour breakpoints (ug/m3)
+    else if (pm2_5_val >= 250.5) {
+        hexToPwm(COLOR_HAZARDOUS);          
+    } else if (pm2_5_val >= 150.5) {
+        hexToPwm(COLOR_VERY_UNHEALTHY);     
+    } else if (pm2_5_val >= 55.5) {
+        hexToPwm(COLOR_UNHEALTHY);          
+    } else if (pm2_5_val >= 35.5) {
+        hexToPwm(COLOR_UNHEALTHY_SENSITIVE);
+    } else if (pm2_5_val >= 12.1) {
+        hexToPwm(COLOR_MODERATE);           
+    } else { // pm2_5_val <= 12.0
+        hexToPwm(COLOR_GOOD);               
+    }
+}
+
+// --- Public Methods ---
+
 void RGBLEDHandler::setup() {
     pinMode(_rPin, OUTPUT);
     pinMode(_gPin, OUTPUT);
     pinMode(_bPin, OUTPUT);
-    // Ensure all off initially
-    setRGBColor(0, 0, 0); 
+    setRGBColor(0, 0, 0); // Ensure all off initially
     Serial.println("RGB LED Handler initialized.");
 }
 
-void RGBLEDHandler::setRGBColor(int r, int g, int b) {
-    analogWrite(_rPin, 255 - r); // Common Cathode: LOW = ON, HIGH = OFF
-    analogWrite(_gPin, 255 - g);
-    analogWrite(_bPin, 255 - b);
+void RGBLEDHandler::startupSequence() {
+    Serial.println("Running RGB Startup Sequence...");
+    
+    // Cycle through all colors for visual check
+    long colors[] = {
+        COLOR_GOOD, COLOR_MODERATE, COLOR_UNHEALTHY_SENSITIVE, 
+        COLOR_UNHEALTHY, COLOR_VERY_UNHEALTHY, COLOR_HAZARDOUS,
+        COLOR_SENSOR_ERROR
+    };
+    
+    for (size_t i = 0; i < sizeof(colors) / sizeof(colors[0]); ++i) {
+        hexToPwm(colors[i]);
+        delay(300); // Short delay for sequence
+    }
+    
+    hexToPwm(0x000000); // Turn off
+    delay(500);
 }
 
-void RGBLEDHandler::startBlink(DiagnosticStatus status) {
-    _isPulsing = false; // Stop pulsing if blinking starts
-    _blinkCount = (int)status * 2;
-    _isBlinking = true;
-    _ledStateTime = millis();
-    setRGBColor(0, 0, 0); // Start with LED ON (effectively LOW for common cathode, but set to black for control)
-    _ledState = LOW; // Represents internal state for blinking logic, not actual color
-}
-
-void RGBLEDHandler::updateLED(bool isWifiConnected, float pm2_5_val, bool sensorDataAvailable) {
-    // Handle blinking for ping status first
-    if (_isBlinking) {
-        if (millis() - _ledStateTime >= 150) {
-            _ledState = !_ledState;
-            if (_ledState == LOW) { // LED ON
-                if (_blinkCount % 2 != 0) { // Red for failure, Green for success
-                     // Based on startBlink status, this assumes odd blinkCount means failure and even means success after decrementing
-                    if (_blinkCount == (int)STATUS_PING_FAILURE * 2 - 1 || _blinkCount == (int)STATUS_PING_FAILURE * 2 - 3) { // Simplified for two blinks
-                        setRGBColor(255, 0, 0); // Red for failure
-                    } else {
-                        setRGBColor(0, 255, 0); // Green for success
-                    }    
-                } else { // LED OFF
-                    setRGBColor(0, 0, 0); // Off
-                }
-            } else { // LED OFF
-                 setRGBColor(0, 0, 0); // Off
-            }
-            _ledStateTime = millis();
-            _blinkCount--;
-
-            if (_blinkCount <= 0) {
-                _isBlinking = false;
-                // After blinking, revert to regular status color
-                _ledStateTime = 0; // Reset for next state
-            }
-        }
-        return; // Exit if currently blinking
-    }
-
-    // Handle WiFi status (highest priority after blinking)
-    if (!isWifiConnected) {
-        // Pulsing Blue for WiFi connecting or AP mode
-        if (!_isPulsing) {
-            _isPulsing = true;
-            _pulseStartTime = millis();
-        }
-        unsigned long pulseTime = millis() - _pulseStartTime;
-        int brightness = map(sin(pulseTime / 500.0), -1, 1, 30, 200); // Slow sine wave pulse
-        setRGBColor(0, 0, brightness); // Blue pulse
-        return;
-    } else {
-        _isPulsing = false; // Stop pulsing once connected
-    }
-
-    // Handle Air Quality (only if WiFi is connected and not blinking)
-    if (!sensorDataAvailable) {
-        setRGBColor(255, 0, 255); // Magenta for sensor error
-    } else {
-        if (pm2_5_val < 12.0) {
-            setRGBColor(0, 255, 0); // Green: Good
-        } else if (pm2_5_val >= 12.0 && pm2_5_val < 35.0) {
-            setRGBColor(255, 255, 0); // Yellow: Moderate (Red + Green)
-        } else {
-            setRGBColor(255, 0, 0); // Red: Bad
-        }
-    }
+void RGBLEDHandler::updateLED(float pm2_5_val, bool sensorDataAvailable) {
+    // The LED only cares about AQI and sensor status.
+    setAqiColor(pm2_5_val, sensorDataAvailable);
 }
