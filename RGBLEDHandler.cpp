@@ -133,37 +133,37 @@ void RGBLEDHandler::startupSequence() {
 
 
     // 1. Fade in the first color (Red)
-    startColorTransition(STARTUP_COLORS[0]);
-    unsigned long sequenceStartTime = millis();
-    while (millis() - sequenceStartTime < FADE_DURATION_MS) {
-        processColorTransition();
-        delay(1); 
-    }
+    // startColorTransition(STARTUP_COLORS[0]);
+    // unsigned long sequenceStartTime = millis();
+    // while (millis() - sequenceStartTime < FADE_DURATION_MS) {
+    //     processColorTransition();
+    //     delay(1); 
+    // }
     setImmediateHexColor(STARTUP_COLORS[0]);
-    delay(500); // Pause on Red
+    delay(1000); // Pause on Red
 
     // 2. Fade through the rest of the colors (Green, then Blue)
     for (size_t i = 1; i < NUM_COLORS; ++i) {
-        startColorTransition(STARTUP_COLORS[i]);
-        unsigned long transitionStart = millis();
+        // startColorTransition(STARTUP_COLORS[i]);
+        // unsigned long transitionStart = millis();
         // Blocking wait for transition to complete
-        while (millis() - transitionStart < FADE_DURATION_MS) {
-            processColorTransition();
-            delay(1); 
-        }
+        // while (millis() - transitionStart < FADE_DURATION_MS) {
+        //     processColorTransition();
+        //     delay(1); 
+        // }
         setImmediateHexColor(STARTUP_COLORS[i]);
-        delay(500); // Pause on Green/Blue
+        delay(1000); // Pause on Green/Blue
     }
     
-    // 3. Fade out to black
-    startColorTransition(0x000000);
-    unsigned long fadeOutStart = millis();
-    while (millis() - fadeOutStart < FADE_DURATION_MS) {
-        processColorTransition();
-        delay(1); 
-    }
+    // // 3. Fade out to black
+    // startColorTransition(0x000000);
+    // unsigned long fadeOutStart = millis();
+    // while (millis() - fadeOutStart < FADE_DURATION_MS) {
+    //     processColorTransition();
+    //     delay(1); 
+    // }
     setImmediateHexColor(0x000000); 
-    delay(500);
+    delay(1000);
 }
 
 void RGBLEDHandler::updateLED(float pm2_5_val, bool sensorDataAvailable) {
