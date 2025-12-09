@@ -25,9 +25,9 @@ const bool USE_MOCK_DATA = false;
 
 // --- Reading Cycle Constants (All Configurable) ---
 const unsigned long INITIAL_AUTO_DELAY_MS = 5000L;    // 1. Initial 5s delay before Passive Mode (X=5s)
-const unsigned long ACTIVE_READ_DURATION_MS = 5000L; // 2. Total reading duration after wake-up (20s)
+const unsigned long ACTIVE_READ_DURATION_MS = 20000L; // 2. Total reading duration after wake-up (20s)
 const unsigned long STABILITY_TIME_MS = 5000L;        // 3. Time required for data to stabilize after wake-up (5s)
-const unsigned long SLEEP_DURATION_MS = 5000L;      // 4. Sleep duration (2 minutes = 120s)
+const unsigned long SLEEP_DURATION_MS = 120000L;      // 4. Sleep duration (2 minutes = 120s)
 
 // --- Loop delay ---
 const long LOOP_DELAY = 1000;
@@ -144,26 +144,25 @@ void handleSensorState() {
         case MODE_SLEEP:
             if (currentDuration >= SLEEP_DURATION_MS) {
                 // Time to wake up and read
-                pmSensor.enterNormalMode(); 
                 
-                // Sensor is now awake and in Passive Mode.
+                // --- CRITICAL WAKE-UP SEQUENCE ---
+                pmSensor.enterNormalMode(); // Sends Wake Up command (Fan/Laser starts)
+                // Short delay to ensure command transmission completes
+                delay(10); 
+                // Switch to Auto Mode: Fan should be spinning and sensor broadcasting data.
+                pmSensor.switchToAutoMode(); 
+                
                 currentSensorMode = MODE_READING;
                 modeStartTime = millis();
-                blynkSendPending = true; 
-                Serial.println("--- State Change: SLEEP -> READING (Waking up, staying in Passive Mode) ---");
+                blynkSendPending = true; // Signal that a Blynk send is needed this cycle
+                Serial.println("--- State Change: SLEEP -> READING (Waking up, switching to Auto Mode) ---");
             }
             break;
 
-        // 3. MODE_READING: Sensor is active, polling for data for ACTIVE_READ_DURATION_MS
+        // 3. MODE_READING: Sensor is active, constantly reading broadcast data
         case MODE_READING:
             
-            // --- DATA REQUEST ---
-            // Request data periodically (every loop, since LOOP_DELAY=1000) and wait briefly.
-            pmSensor.requestData(); 
-            // CRITICAL FIX: Give the sensor a moment to transmit the packet header.
-            delay(10); 
-
-            // Check for new data packet received
+            // Check for new data packet received (Sensor is broadcasting in Auto Mode)
             dataWasRead = pmSensor.readData(pm1_0_val, pm2_5_val, pm10_0_val, USE_MOCK_DATA);
             
             // --- STABILITY CHECK AND BLYNK TRIGGER ---
@@ -176,7 +175,8 @@ void handleSensorState() {
 
             if (currentDuration >= ACTIVE_READ_DURATION_MS) {
                 // Time to switch back to standby
-                pmSensor.enterStandbyMode();
+                pmSensor.switchToPassiveMode(); // Set mode back to Passive before sleep
+                pmSensor.enterStandbyMode();    // Go to sleep
                 currentSensorMode = MODE_SLEEP;
                 modeStartTime = millis();
                 Serial.println("--- State Change: READING -> SLEEP (Reading Complete) ---");
