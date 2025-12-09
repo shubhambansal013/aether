@@ -20,8 +20,7 @@ const long DEBUG_BAUD_RATE = 115200;
 const int SETUP_DELAY_MS = 100;
 
 // --- Wi-Fi Connection Constants ---
-// NOTE: QUICK_CONNECT_TIMEOUT_MS and CONFIG_AP_TIMEOUT_SEC are no longer used
-// as the WiFiHandler now implements indefinite connection/AP mode.
+// Constants removed as they are no longer used by WiFiHandler.
 
 // --- Sensor Constants ---
 const long SENSOR_BAUD_RATE = 9600;
@@ -72,13 +71,14 @@ void setup() {
 
     // Initialize RGB LED
     rgbLEDHandler.setup();
+    // 🧹 NEW: Run the startup sequence to verify colors
+    rgbLEDHandler.startupSequence();
 
     // 2. Check for Power Cycle Reset (Must be run before Wi-Fi)
     resetHandler.checkPowerCycles();
 
     // 3. Initialize Wi-Fi (STARTS NON-BLOCKING STA CONNECT/AP ATTEMPT)
     oledDisplay.printMessage("WiFi", "Starting...");
-    // 🧹 UPDATE: Call simplified startConnect() without timeout parameters
     wifiHandler.startConnect();
 
     // 4. Initialize Sensor Mock/Serial
@@ -113,7 +113,8 @@ void loop() {
     // 4. Update Statuses and Display
     String wifiStatusStr = wifiHandler.getWifiStatus();
     
-    rgbLEDHandler.updateLED(currentlyConnected, pm2_5_val, sensorDataAvailable);
+    // 🧹 UPDATE: Simplified call to updateLED, only passing PM2.5 and sensor status
+    rgbLEDHandler.updateLED(pm2_5_val, sensorDataAvailable);
 
     // Always attempt to display PM data, and DHT data if available
     oledDisplay.displaySensorDataAndWifiStatus(wifiStatusStr, pm1_0_val, pm2_5_val, pm10_0_val, h, t);

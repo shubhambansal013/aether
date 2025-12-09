@@ -1,10 +1,40 @@
 // OLEDDisplay.cpp
 
 #include "OLEDDisplay.h"
-#include "pins.h" // Assuming SCREEN_WIDTH, SCREEN_HEIGHT, OLED_RESET, OLED_SDA_PIN, OLED_SCL_PIN are here
+#include "pins.h" 
+
+// SSD1306 Command definition for setting contrast (used in the fix)
+#define SSD1306_SETCONTRAST 0x81
+#define SCREEN_ADDRESS 0x3C // Assuming common I2C address
 
 // Constructor
 OLEDDisplay::OLEDDisplay() : display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET) {}
+
+// --- Brightness/Contrast Control (Implementation of the working fix) ---
+
+void OLEDDisplay::setOLEDContrast(uint8_t value) {
+    // 1. Send command byte (0x00)
+    Wire.beginTransmission(SCREEN_ADDRESS);
+    Wire.write(0x00);
+    
+    // 2. Send the Contrast Command (0x81)
+    Wire.write(SSD1306_SETCONTRAST);
+    
+    // 3. Send the Contrast Value (0-255)
+    Wire.write(value);
+    Wire.endTransmission();
+}
+
+void OLEDDisplay::setBrightness(uint8_t contrast_value) {
+    setOLEDContrast(contrast_value);
+    // It's good practice to force a display update after changing contrast
+    display.display(); 
+    Serial.printf("OLEDDisplay: Brightness (Contrast) set to %d.\n", contrast_value);
+}
+
+// ----------------------------------------------------------------------
+// --- Setup and Display Functions ---
+// ----------------------------------------------------------------------
 
 void OLEDDisplay::setup() {
     Serial.println("OLEDDisplay: Initializing Wire library...");
@@ -13,11 +43,14 @@ void OLEDDisplay::setup() {
     Serial.println("OLEDDisplay: Wire library initialized with pins from pins.h.");
 
     Serial.print("OLEDDisplay: Attempting display.begin(0x3C)...");
-    if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { 
+    if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) { 
         Serial.println(F("SSD1306 allocation failed"));
         for (;;); // Loop forever if allocation fails
     }
     Serial.println("OLEDDisplay: display.begin() successful.");
+
+    // ⭐ FIX: Use the constant from the header file
+    setBrightness(DEFAULT_OLED_BRIGHTNESS); 
 
     display.clearDisplay();
     display.setTextSize(1);
@@ -120,13 +153,13 @@ void OLEDDisplay::displaySensorDataAndWifiStatus(String wifiStatus, float pm1_0,
     // Truncate/rename status to fit beside the icon (128 - 10 pixels for icon/padding)
     String status_display;
     if (wifiStatus == "AP Config") {
-         status_display = "SETUP AP"; 
+        status_display = "SETUP AP"; 
     } else if (wifiStatus == "Connecting...") {
-         status_display = "Connecting...";
+        status_display = "Connecting...";
     } else if (wifiStatus == "Idle/Disconnected") {
-         status_display = "DISCONNECTED";
+        status_display = "DISCONNECTED";
     } else {
-         status_display = wifiStatus;
+        status_display = wifiStatus;
     }
     display.print(status_display);
 
