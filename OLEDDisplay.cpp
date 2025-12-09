@@ -133,8 +133,8 @@ void OLEDDisplay::drawWifiIcon(int16_t x, int16_t y, String status) {
 }
 
 
-// ⭐ REVISED: Main display function with improved layout and font sizes
-void OLEDDisplay::displaySensorDataAndWifiStatus(String wifiStatus, float pm1_0, float pm2_5, float pm10_0, float humidity, float temperature) {
+// ⭐ REVISED: Main display function with new signature and sensor mode handling
+void OLEDDisplay::displaySensorDataAndWifiStatus(String sensorModeChar, String wifiStatus, float pm1_0, float pm2_5, float pm10_0, float humidity, float temperature) {
     display.clearDisplay();
     display.setTextColor(SSD1306_WHITE);
     
@@ -146,11 +146,15 @@ void OLEDDisplay::displaySensorDataAndWifiStatus(String wifiStatus, float pm1_0,
     // Icon is 8x8, placing it at X=120, Y=0 (128 - 8)
     drawWifiIcon(SCREEN_WIDTH - 8, 0, wifiStatus);
     
-    // B. Display Wi-Fi Status Text (Top Left)
+    // B. Display Sensor Mode and Wi-Fi Status Text (Top Left)
     display.setTextSize(1);
     display.setCursor(0, 0);
     
-    // Truncate/rename status to fit beside the icon (128 - 10 pixels for icon/padding)
+    // 1. Display Sensor Mode Character (A/P/R/S)
+    display.print(sensorModeChar);
+    display.print("/");
+    
+    // 2. Display Wi-Fi Status Text
     String status_display;
     if (wifiStatus == "AP Config") {
         status_display = "SETUP AP"; 
