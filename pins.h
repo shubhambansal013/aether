@@ -7,7 +7,7 @@
 // PM Sensor Pin (Single SoftwareSerial RX line on D5)
 // This uses a non-conflicting pin, avoiding the D3/GPIO3 upload issue.
 const int PM_SENSOR_RX_PIN = 14; // GPIO 14 (D5) -> Connected to Sensor TX (Data Out)
-const int PM_SENSOR_TX_PIN = -1; // Not used (MCU is not sending commands)
+const int PM_SENSOR_TX_PIN = 0; // GPIO 0 (D3) -> Connected to Sensor RX (Data in)
 
 // RGB LED Pins (Common Cathode)
 // Clustered on D6, D7, and D8 for clean wiring.
