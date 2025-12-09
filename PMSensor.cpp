@@ -74,40 +74,52 @@ void PMSensor::sendCommand(byte cmd, byte dataL) {
     commandFrame[5] = (byte)(checksum >> 8);  // Check byte High
     commandFrame[6] = (byte)(checksum & 0xFF); // Check byte Low
 
-    // 3. Send the command
+    // 3. Debug logging before sending
+    Serial.print("Sending Command: 0x");
+    for (int i = 0; i < COMMAND_SIZE; i++) {
+        if (commandFrame[i] < 0x10) Serial.print("0");
+        Serial.print(commandFrame[i], HEX);
+        Serial.print(" ");
+    }
+    Serial.println();
+    
+    // 4. Send the command
     _pmSerial.write(commandFrame, COMMAND_SIZE);
     _pmSerial.flush(); // Ensure all bytes are sent
-    
-    Serial.print("Command Sent (0x"); 
-    Serial.print(cmd, HEX); 
-    Serial.print(" 0x"); 
-    Serial.print(dataL, HEX);
-    Serial.print("). Checksum: 0x"); 
-    Serial.println(checksum, HEX);
 }
 
 
 // --- Public Command Functions ---
 
 void PMSensor::switchToPassiveMode() {
+    Serial.println(">>> Executing Command: Switch to Passive Mode (Request-Response) <<<");
     sendCommand(0xE1, 0x00); 
+    Serial.println("--- Successfully Switched to Passive Mode. Call requestData() to get readings. ---");
 }
 
 void PMSensor::switchToAutoMode() {
+    Serial.println(">>> Executing Command: Switch to Auto Mode (Continuous Output) <<<");
     sendCommand(0xE1, 0x01); 
+    Serial.println("--- Successfully Switched to Auto Mode. Sensor will output data every second. ---");
 }
 
 void PMSensor::enterStandbyMode() {
+    Serial.println(">>> Executing Command: Enter Standby/Sleep Mode <<<");
     sendCommand(0xE4, 0x00);
+    Serial.println("--- Successfully Entered Standby Mode (Fan/Laser OFF). ---");
 }
 
 void PMSensor::enterNormalMode() {
+    Serial.println(">>> Executing Command: Enter Normal Working Mode (Wake Up) <<<");
     sendCommand(0xE4, 0x01);
+    Serial.println("--- Successfully Woke Up. Wait >30s for stable readings. ---");
 }
 
 void PMSensor::requestData() {
+    Serial.println(">>> Executing Command: Request Data (Passive Read) <<<");
     // 0xE2 0x00 is the command to request a 32-byte packet in passive mode.
     sendCommand(0xE2, 0x00);
+    Serial.println("--- Data Request Sent. Waiting for response packet... ---");
 }
 
 
@@ -170,7 +182,7 @@ bool PMSensor::readSensorPacket() {
           Serial.println(receivedChecksum);
           return false;
         }
-
+        
         // 4. Data Parsing: Extract the PM values (Big-Endian/MSB first)
         
         // Standard Particulate Matter Concentrations (Industrial)
@@ -191,6 +203,7 @@ bool PMSensor::readSensorPacket() {
         
         // 5. Output Results ---
         Serial.println("----------------------------------------");
+        Serial.println("--- DATA PACKET RECEIVED & PARSED ---");
         Serial.print("Raw Hex Packet: ");
         for (int i = 0; i < PACKET_SIZE; i++) {
           if (dataPacket[i] < 0x10) Serial.print("0");
@@ -198,8 +211,54 @@ bool PMSensor::readSensorPacket() {
           Serial.print(" ");
         }
         Serial.println();
-        Serial.println("--- Parsed PM Data (ug/m^3) ---");
-        
         Serial.println("Standard Particulate Matter (Industrial):");
         Serial.print("PM 1.0 (Standard): "); Serial.println(pm1_0_standard);
-        Serial.
+        Serial.print("PM 2.5 (Standard): "); Serial.println(pm2_5_standard);
+        Serial.print("PM 10.0 (Standard): "); Serial.println(pm10_standard);
+        
+        Serial.println("Atmospheric Environment (Ambient):");
+        Serial.print("PM 1.0 (Atmospheric): "); Serial.println(pm1_0_atm);
+        Serial.print("PM 2.5 (Atmospheric): "); Serial.println(pm2_5_atm);
+        Serial.print("PM 10.0 (Atmospheric): "); Serial.println(pm10_atm);
+
+        Serial.println("----------------------------------------");
+
+        _data->pm10_standard = pm1_0_standard;
+        _data->pm25_standard = pm2_5_standard;
+        _data->pm100_standard = pm10_standard;
+        _data->pm10_env = pm1_0_atm;
+        _data->pm25_env = pm2_5_atm;
+        _data->pm100_env = pm10_atm;
+        _data->checksum = receivedChecksum;
+        return true; // Packet successfully read and parsed
+
+      } else {
+          // Serial.println("Byte 1 was 0x42, but Byte 2 was not 0x4D. Discard 0x42 and continue search.");
+      }
+    }
+  }
+  return false; // No data available
+}
+
+bool PMSensor::readPmsData() {
+    return readSensorPacket();
+}
+
+
+// --- Main Read Function ---
+
+bool PMSensor::readData(float& pm1_0, float& pm2_5, float& pm10_0, bool useMockData) {
+    if (useMockData) {
+        generateMockData(pm1_0, pm2_5, pm10_0);
+        return true;
+    } else {
+        if (readPmsData()) {
+            // We use the ambient (atmospheric) values as they are typically more relevant
+            pm1_0 = _data->pm10_env;
+            pm2_5 = _data->pm25_env;
+            pm10_0 = _data->pm100_env;
+            return true;
+        }
+        return false;
+    }
+}
