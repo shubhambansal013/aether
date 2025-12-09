@@ -19,13 +19,15 @@ const char* FIRMWARE_VERSION = "V1.0.10 - OLED Fix";
 const long DEBUG_BAUD_RATE = 115200;
 const int SETUP_DELAY_MS = 100;
 
-// --- Wi-Fi Connection Constants ---
-// Constants removed as they are no longer used by WiFiHandler.
-
 // --- Sensor Constants ---
 const long SENSOR_BAUD_RATE = 9600;
 const unsigned long BLYNK_SEND_INTERVAL_MS = 60000L;
 const bool USE_MOCK_DATA = false;
+
+// --- Standby Mode Timing ---
+const unsigned long STANDBY_MODE_DELAY_MS = 5000L; // X = 5 seconds
+bool standbyModeSet = false;
+unsigned long firstRunTime = 0; // To store the time setup finishes
 
 // --- Loop delay ---
 const long LOOP_DELAY = 1000;
@@ -83,9 +85,12 @@ void setup() {
 
     // 4. Initialize Sensor Mock/Serial
     pmSensor.begin(SENSOR_BAUD_RATE);
-
+    
     // 5. Initialize DHT22 Sensor
     dhtSensor.setup();
+    
+    // 6. Record time after initial setup
+    firstRunTime = millis();
 }
 
 void loop() {
@@ -95,55 +100,71 @@ void loop() {
     // Determine connection status based on Station (client) mode only
     bool currentlyConnected = (WiFi.status() == WL_CONNECTED && WiFi.getMode() == WIFI_STA);
 
-    // 2. OTA Initialization and Handling (Logic commented out, but structures kept)
-    // if (currentlyConnected && !_otaInitialized) {
-    //     Serial.println("Wi-Fi connected successfully! Initializing OTA...");
-    //     otaHandler.setupArduinoOTA();
-    //     _otaInitialized = true;
-    // }
-    // if (_otaInitialized) {
-    //     otaHandler.handleArduinoOTA();
-    // }
+    // 2. Standby Mode Command Execution (5 seconds after start)
+    if (!standbyModeSet && (millis() - firstRunTime >= STANDBY_MODE_DELAY_MS)) {
+        pmSensor.enterStandbyMode();
+        standbyModeSet = true;
+    }
 
-    // 3. Read Sensor Data (Runs every loop regardless of WiFi status)
-    bool sensorDataAvailable = pmSensor.readData(pm1_0_val, pm2_5_val, pm10_0_val, USE_MOCK_DATA);
-    float h = dhtSensor.readHumidity();
-    float t = dhtSensor.readTemperature();
+    // 3. OTA Handling (Skipped for brevity)
 
-    // 4. Update Statuses and Display
-    String wifiStatusStr = wifiHandler.getWifiStatus();
-    
-    // 🧹 UPDATE: Simplified call to updateLED, only passing PM2.5 and sensor status
-    rgbLEDHandler.updateLED(pm2_5_val, sensorDataAvailable);
-
-    // Always attempt to display PM data, and DHT data if available
-    oledDisplay.displaySensorDataAndWifiStatus(wifiStatusStr, pm1_0_val, pm2_5_val, pm10_0_val, h, t);
-
-    // 5. Blynk Data Transmission
+    // 4. Blynk Data Transmission and Sensor Reading
     if (millis() - lastSendTime > BLYNK_SEND_INTERVAL_MS) {
+        
+        bool sensorDataAvailable = false;
+        
+        // --- WAKE UP, READ, and SLEEP Logic ---
+        if (standbyModeSet) {
+            // A. Wake up the sensor
+            pmSensor.enterNormalMode();
+            // B. Wait for stability (30 seconds recommended, but shortened for testing)
+            delay(3000); // 3 seconds delay for initial stability check
+            
+            // C. Read the data (assuming Auto mode now sends a burst of data)
+            sensorDataAvailable = pmSensor.readData(pm1_0_val, pm2_5_val, pm10_0_val, USE_MOCK_DATA);
+            
+            // D. Put the sensor back to sleep
+            pmSensor.enterStandbyMode();
+        } else {
+            // If standby hasn't been set yet (initial 5s window), just read continuously
+            sensorDataAvailable = pmSensor.readData(pm1_0_val, pm2_5_val, pm10_0_val, USE_MOCK_DATA);
+        }
+        
+        // --- DHT Reading (Unchanged) ---
+        float h = dhtSensor.readHumidity();
+        float t = dhtSensor.readTemperature();
+
+        // Check if data is available and connected before sending
         if (sensorDataAvailable && currentlyConnected) {
             // *** BLYNK UPDATE ***
             blynkHandler.sendData(BLYNK_AUTH_TOKEN, pm1_0_val, pm2_5_val, pm10_0_val, t, h);
             lastSendTime = millis();
         }
-    }
-    
-    // 6. Serial Debug Output
-    if (sensorDataAvailable) {
-        Serial.print("Data Read (Mock="); Serial.print(USE_MOCK_DATA ? "T" : "F");
-        Serial.print("): PM2.5="); Serial.println(pm2_5_val);
-    } else {
-        Serial.println("PM sensor data not available.");
-    }
         
-    if (!isnan(h) && !isnan(t)) {
-        String tempStr = "T: " + String(t, 1) + "C";
-        String humStr = "H: " + String(h, 0) + "%";
-        Serial.println(tempStr);
-        Serial.println(humStr);
-    } else {
-        Serial.println("DHT Sensor read failed.");
+        // 5. Update Statuses and Display
+        String wifiStatusStr = wifiHandler.getWifiStatus();
+        rgbLEDHandler.updateLED(pm2_5_val, sensorDataAvailable);
+
+        oledDisplay.displaySensorDataAndWifiStatus(wifiStatusStr, pm1_0_val, pm2_5_val, pm10_0_val, h, t);
+
+        // 6. Serial Debug Output
+        if (sensorDataAvailable) {
+            Serial.print("Data Read (Mock="); Serial.print(USE_MOCK_DATA ? "T" : "F");
+            Serial.print("): PM2.5="); Serial.println(pm2_5_val);
+        } else {
+            Serial.println("PM sensor data not available.");
+        }
+            
+        if (!isnan(h) && !isnan(t)) {
+            String tempStr = "T: " + String(t, 1) + "C";
+            String humStr = "H: " + String(h, 0) + "%";
+            Serial.println(tempStr);
+            Serial.println(humStr);
+        } else {
+            Serial.println("DHT Sensor read failed.");
+        }
     }
     
+    // 7. Loop Delay
     delay(LOOP_DELAY);
 }
