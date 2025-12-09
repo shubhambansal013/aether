@@ -26,15 +26,13 @@ const bool USE_MOCK_DATA = false;
 // --- Reading Cycle Constants (All Configurable) ---
 const unsigned long INITIAL_AUTO_DELAY_MS = 5000L;    // 1. Initial 5s delay before Passive Mode (X=5s)
 const unsigned long ACTIVE_READ_DURATION_MS = 20000L; // 2. Total reading duration after wake-up (20s)
-const unsigned long STABILITY_TIME_MS = 10000L;        // 3. Time required for data to stabilize after wake-up (5s)
+const unsigned long STABILITY_TIME_MS = 5000L;        // 3. Time required for data to stabilize after wake-up (5s)
 const unsigned long SLEEP_DURATION_MS = 120000L;      // 4. Sleep duration (2 minutes = 120s)
 
 // --- Loop delay ---
 const long LOOP_DELAY = 1000;
 
 // --- Blynk Timing Control ---
-// Blynk send interval is now effectively managed by the sleep cycle, but we use this 
-// to track when the last SUCCESSFUL send happened.
 unsigned long lastBlynkSendTime = 0;
 // ----------------------------------------------------------------------
 
@@ -129,6 +127,9 @@ void handleSensorState() {
         
         // 1. MODE_AUTO: Initial state, waits for INITIAL_AUTO_DELAY_MS
         case MODE_AUTO:
+            // === NEW: Read data during the initial period ===
+            pmSensor.readData(pm1_0_val, pm2_5_val, pm10_0_val, USE_MOCK_DATA);
+            
             if (currentDuration >= INITIAL_AUTO_DELAY_MS) {
                 // Initializing Passive Mode and Standby
                 pmSensor.switchToPassiveMode();
