@@ -56,13 +56,13 @@ private:
 
 
     // AQI Color Hex Codes (based on EPA and prototype)
-    static const long COLOR_GOOD                = 0x00FF00;  // Green (0.0-12.0)
-    static const long COLOR_MODERATE            = 0xFFFF00;  // Yellow (12.1-35.4)
-    static const long COLOR_UNHEALTHY_SENSITIVE = 0xFF8000;  // Orange (35.5-55.4)
-    static const long COLOR_UNHEALTHY           = 0xFF0000;  // Red (55.5-150.4)
-    static const long COLOR_VERY_UNHEALTHY      = 0x800080;  // Purple (150.5-250.4)
-    static const long COLOR_HAZARDOUS           = 0x80000A;  // Maroon (250.5+)
-    static const long COLOR_SENSOR_ERROR        = 0xFF00FF;  // Magenta (Sensor read failure)
+    static const long COLOR_GOOD 			    = 0x00FF00; // Bright Green (Green Full)
+    static const long COLOR_MODERATE            = 0xFFFF00; // Yellow (Red + Green Full)
+    static const long COLOR_UNHEALTHY_SENSITIVE = 0xFF8000; // Orange (Red Full, Green Half)
+    static const long COLOR_UNHEALTHY           = 0xFF00FF; // **Pink** (Red Full, Blue Full)
+    static const long COLOR_VERY_UNHEALTHY      = 0x8000FF; // Purple/Violet (Red Half, Blue Half)
+    static const long COLOR_HAZARDOUS           = 0xFF0000; // **Pure Red** (Red Full)
+    static const long COLOR_SENSOR_ERROR        = 0x0000FF;  // Blue (Sensor read failure)
 };
 
 #endif // RGBLED_HANDLER_H
