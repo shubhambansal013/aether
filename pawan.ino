@@ -66,7 +66,6 @@ float pm1_0_val = 0.0;
 float pm2_5_val = 0.0;
 float pm10_0_val = 0.0;
 bool blynkSendPending = false; // Flag to ensure Blynk is sent exactly once per read cycle
-bool readRequestSent = false;  // NEW: Flag to track if we've requested data this loop
 bool _otaInitialized = false; 
 
 // ----------------------------------------------------------------------
@@ -128,12 +127,13 @@ void handleSensorState() {
         
         // 1. MODE_AUTO: Initial state, waits for INITIAL_AUTO_DELAY_MS
         case MODE_AUTO:
+            // Read data during the initial period for display
             pmSensor.readData(pm1_0_val, pm2_5_val, pm10_0_val, USE_MOCK_DATA);
             
             if (currentDuration >= INITIAL_AUTO_DELAY_MS) {
                 // Initialize Passive Mode and Standby for the cycle
-                pmSensor.switchToPassiveMode(); // Ensure it is set to passive mode
-                pmSensor.enterStandbyMode();    // Go to sleep
+                pmSensor.switchToPassiveMode(); 
+                pmSensor.enterStandbyMode();    
                 currentSensorMode = MODE_SLEEP;
                 modeStartTime = millis();
                 Serial.println("--- State Change: AUTO -> SLEEP (Initial Passive Mode Set) ---");
@@ -142,14 +142,15 @@ void handleSensorState() {
 
         // 2. MODE_SLEEP: Sensor is asleep, waiting for SLEEP_DURATION_MS
         case MODE_SLEEP:
-            readRequestSent = false; // Reset read request flag
             if (currentDuration >= SLEEP_DURATION_MS) {
                 // Time to wake up and read
-                pmSensor.enterNormalMode(); // Wake up (Sensor is now in Passive Mode)
+                pmSensor.enterNormalMode(); 
+                
+                // Sensor is now awake and in Passive Mode.
                 currentSensorMode = MODE_READING;
                 modeStartTime = millis();
-                blynkSendPending = true; // Signal that a Blynk send is needed this cycle
-                Serial.println("--- State Change: SLEEP -> READING (Waking up, remaining in Passive Mode) ---");
+                blynkSendPending = true; 
+                Serial.println("--- State Change: SLEEP -> READING (Waking up, staying in Passive Mode) ---");
             }
             break;
 
@@ -157,19 +158,17 @@ void handleSensorState() {
         case MODE_READING:
             
             // --- DATA REQUEST ---
-            // Request data every LOOP_DELAY if it hasn't been requested this cycle
-            // NOTE: Sending the request every loop is safe and common with SoftwareSerial
-            if (!readRequestSent || (millis() - modeStartTime) % LOOP_DELAY == 0) {
-                 pmSensor.requestData(); // Request a data packet
-                 readRequestSent = true;
-            }
+            // Request data periodically (every loop, since LOOP_DELAY=1000) and wait briefly.
+            pmSensor.requestData(); 
+            // CRITICAL FIX: Give the sensor a moment to transmit the packet header.
+            delay(10); 
 
             // Check for new data packet received
             dataWasRead = pmSensor.readData(pm1_0_val, pm2_5_val, pm10_0_val, USE_MOCK_DATA);
             
             // --- STABILITY CHECK AND BLYNK TRIGGER ---
             if (dataWasRead && blynkSendPending && (currentDuration >= STABILITY_TIME_MS)) {
-                // Data is fresh (dataWasRead), ready to send (blynkSendPending), and stable (past STABILITY_TIME_MS)
+                // Data is fresh, ready to send, and stable.
                 lastBlynkSendTime = 0; // Trigger Blynk send in loop()
                 blynkSendPending = false; // Clear flag until next sleep cycle
                 Serial.println("--- Stable Data Acquired. Triggering Blynk Send. ---");
