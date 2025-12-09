@@ -2,10 +2,11 @@
 
 #include "PMSensor.h"
 
-// PM Sensor Protocol Constants (Confirmed by data stream)
+// PM Sensor Protocol Constants 
 const byte START_BYTE_1 = 0x42;
 const byte START_BYTE_2 = 0x4D;
-const byte PACKET_SIZE = 32; // Total bytes in the packet (2 start + 2 length + 26 data + 2 checksum)
+const byte PACKET_SIZE = 32;   // Total bytes in the data packet
+const byte COMMAND_SIZE = 7;   // Total bytes in a command frame
 
 // Buffer to hold the incoming data packet
 byte dataPacket[PACKET_SIZE];
@@ -44,86 +45,74 @@ void PMSensor::generateMockData(float& pm1_0, float& pm2_5, float& pm10_0) {
     pm10_0 = round(pm10_0 * 10.0) / 10.0;
 }
 
-// --- Real Sensor Reading ---
 
-// bool PMSensor::readPmsData() {
-//     // 1. Synchronize: Wait for the two-byte START_SEQUENCE (0x42 0x4D)
-//     Serial.print("PMSensor available: "); Serial.println(_pmSerial.available());
-//     while (_pmSerial.available()) {
-//         byte incomingByte = _pmSerial.read();
+// --- Private Command Helper ---
 
-//         if (incomingByte == 0x42) { // START_BYTE_1
-//             Serial.println("Found the first start byte. Check if the second byte is available and correct.");
-//             if (_pmSerial.available() < 31) { // PACKET_SIZE - 1
-//                 Serial.println("Not enough data immediately available, wait a moment");
-//                 delay(5);
-//                 if (_pmSerial.available() < 31) {
-//                     Serial.println("If still not enough, assume misalignment and discard this byte");
-//                     continue; 
-//                 }
-//             }
+/**
+ * The command format is 7 bytes: 
+ * 0x42 0x4D CMD 0x00 DATAL SUMH SUML
+ */
+void PMSensor::sendCommand(byte cmd, byte dataL) {
+    // Note: Data byte 1 (DATAH) is always 0x00 for these specific commands.
+    byte commandFrame[COMMAND_SIZE] = {
+        START_BYTE_1,   // 0: Frame Header 1 (0x42)
+        START_BYTE_2,   // 1: Frame Header 2 (0x4D)
+        cmd,            // 2: Command byte (0xE1, 0xE2, or 0xE4)
+        0x00,           // 3: Data byte 1 (DATAH)
+        dataL,          // 4: Data byte 2 (DATAL)
+        0x00,           // 5: Check byte High (Placeholder)
+        0x00            // 6: Check byte Low (Placeholder)
+    };
 
-//             if (_pmSerial.peek() == 0x4D) { // START_BYTE_2
-//                 // --- Synchronization Found ---
-//                 uint8_t buffer[32];
-//                 buffer[0] = incomingByte;
-//                 buffer[1] = _pmSerial.read(); 
+    // 1. Calculate the 16-bit checksum (sum of bytes 0 through 4)
+    uint16_t checksum = 0;
+    for (int i = 0; i < 5; i++) {
+        checksum += commandFrame[i];
+    }
 
-//                 // 2. Read the rest of the fixed-size packet (30 bytes remaining)
-//                 int bytesRead = _pmSerial.readBytes(&buffer[2], 30);
+    // 2. Insert the calculated checksum into the command frame (MSB first)
+    commandFrame[5] = (byte)(checksum >> 8);  // Check byte High
+    commandFrame[6] = (byte)(checksum & 0xFF); // Check byte Low
 
-//                 if (bytesRead < 30) {
-//                     Serial.println("Error: Timeout while waiting for full packet.");
-//                     return false;
-//                 }
-
-//                 // 3. Checksum Validation
-//                 unsigned int calculatedChecksum = 0;
-//                 for (int i = 0; i < 30; i++) {
-//                     calculatedChecksum += buffer[i];
-//                 }
-                
-//                 unsigned int receivedChecksum = makeWord(buffer[30], buffer[31]);
-
-//                 if (calculatedChecksum != receivedChecksum) {
-//                     Serial.print("Error: Checksum mismatch. Calculated: ");
-//                     Serial.print(calculatedChecksum);
-//                     Serial.print(", Received: ");
-//                     Serial.println(receivedChecksum);
-//                     return false;
-//                 }
-
-//                 // 4. Data Parsing (from the validated buffer)
-//                 _data->framelen = makeWord(buffer[2], buffer[3]);
-//                 _data->pm10_standard = makeWord(buffer[4], buffer[5]);
-//                 _data->pm25_standard = makeWord(buffer[6], buffer[7]);
-//                 _data->pm100_standard = makeWord(buffer[8], buffer[9]);
-//                 _data->pm10_env = makeWord(buffer[10], buffer[11]);
-//                 _data->pm25_env = makeWord(buffer[12], buffer[13]);
-//                 _data->pm100_env = makeWord(buffer[14], buffer[15]);
-//                 _data->particles_03um = makeWord(buffer[16], buffer[17]);
-//                 _data->particles_05um = makeWord(buffer[18], buffer[19]);
-//                 _data->particles_10um = makeWord(buffer[20], buffer[21]);
-//                 _data->particles_25um = makeWord(buffer[22], buffer[23]);
-//                 _data->particles_50um = makeWord(buffer[24], buffer[25]);
-//                 _data->particles_100um = makeWord(buffer[26], buffer[27]);
-//                 _data->unused = makeWord(buffer[28], buffer[29]);
-//                 _data->checksum = receivedChecksum;
-                
-//                 return true; // Packet successfully read and parsed
-
-//             }
-//         }
-//     }
-//     return false; // No data available or sync failed
-// }
-
-bool PMSensor::readPmsData() {
-    return readSensorPacket();
+    // 3. Send the command
+    _pmSerial.write(commandFrame, COMMAND_SIZE);
+    _pmSerial.flush(); // Ensure all bytes are sent
+    
+    Serial.print("Command Sent (0x"); 
+    Serial.print(cmd, HEX); 
+    Serial.print(" 0x"); 
+    Serial.print(dataL, HEX);
+    Serial.print("). Checksum: 0x"); 
+    Serial.println(checksum, HEX);
 }
 
 
-// Function to read and process the sensor data packet
+// --- Public Command Functions ---
+
+void PMSensor::switchToPassiveMode() {
+    sendCommand(0xE1, 0x00); 
+}
+
+void PMSensor::switchToAutoMode() {
+    sendCommand(0xE1, 0x01); 
+}
+
+void PMSensor::enterStandbyMode() {
+    sendCommand(0xE4, 0x00);
+}
+
+void PMSensor::enterNormalMode() {
+    sendCommand(0xE4, 0x01);
+}
+
+void PMSensor::requestData() {
+    // 0xE2 0x00 is the command to request a 32-byte packet in passive mode.
+    sendCommand(0xE2, 0x00);
+}
+
+
+// --- Real Sensor Reading ---
+
 bool PMSensor::readSensorPacket() {
   // 1. Synchronize: Wait for the two-byte START_SEQUENCE (0x42 0x4D)
   Serial.print("Sensor available: "); Serial.println(_pmSerial.available());
@@ -213,46 +202,4 @@ bool PMSensor::readSensorPacket() {
         
         Serial.println("Standard Particulate Matter (Industrial):");
         Serial.print("PM 1.0 (Standard): "); Serial.println(pm1_0_standard);
-        Serial.print("PM 2.5 (Standard): "); Serial.println(pm2_5_standard);
-        Serial.print("PM 10.0 (Standard): "); Serial.println(pm10_standard);
-        
-        Serial.println("Atmospheric Environment (Ambient):");
-        Serial.print("PM 1.0 (Atmospheric): "); Serial.println(pm1_0_atm);
-        Serial.print("PM 2.5 (Atmospheric): "); Serial.println(pm2_5_atm);
-        Serial.print("PM 10.0 (Atmospheric): "); Serial.println(pm10_atm);
-
-        Serial.println("----------------------------------------");
-
-        _data->pm10_standard = pm1_0_standard;
-        _data->pm25_standard = pm2_5_standard;
-        _data->pm100_standard = pm10_standard;
-        _data->pm10_env = pm1_0_atm;
-        _data->pm25_env = pm2_5_atm;
-        _data->pm100_env = pm10_atm;
-        _data->checksum = receivedChecksum;
-        return true; // Packet successfully read and parsed
-
-      } else {
-          Serial.println("Byte 1 was 0x42, but Byte 2 was not 0x4D. Discard 0x42 and continue search.");
-      }
-    }
-  }
-  return false; // No data available
-}
-
-// --- Main Read Function ---
-
-bool PMSensor::readData(float& pm1_0, float& pm2_5, float& pm10_0, bool useMockData) {
-    if (useMockData) {
-        generateMockData(pm1_0, pm2_5, pm10_0);
-        return true;
-    } else {
-        if (readPmsData()) {
-            pm1_0 = _data->pm10_standard;
-            pm2_5 = _data->pm25_standard;
-            pm10_0 = _data->pm100_standard;
-            return true;
-        }
-        return false;
-    }
-}
+        Serial.
