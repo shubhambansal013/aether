@@ -21,16 +21,21 @@ const int SETUP_DELAY_MS = 100;
 
 // --- Sensor Constants ---
 const long SENSOR_BAUD_RATE = 9600;
-const unsigned long BLYNK_SEND_INTERVAL_MS = 60000L;
 const bool USE_MOCK_DATA = false;
 
-// --- Standby Mode Timing ---
-const unsigned long STANDBY_MODE_DELAY_MS = 5000L; // X = 5 seconds
-bool standbyModeSet = false;
-unsigned long firstRunTime = 0; // To store the time setup finishes
+// --- Reading Cycle Constants (All Configurable) ---
+const unsigned long INITIAL_AUTO_DELAY_MS = 5000L;    // 1. Initial 5s delay before Passive Mode (X=5s)
+const unsigned long ACTIVE_READ_DURATION_MS = 20000L; // 2. Total reading duration after wake-up (20s)
+const unsigned long STABILITY_TIME_MS = 10000L;        // 3. Time required for data to stabilize after wake-up (5s)
+const unsigned long SLEEP_DURATION_MS = 120000L;      // 4. Sleep duration (2 minutes = 120s)
 
 // --- Loop delay ---
 const long LOOP_DELAY = 1000;
+
+// --- Blynk Timing Control ---
+// Blynk send interval is now effectively managed by the sleep cycle, but we use this 
+// to track when the last SUCCESSFUL send happened.
+unsigned long lastBlynkSendTime = 0;
 // ----------------------------------------------------------------------
 
 // --- OTA Update Constants (Unchanged) ---
@@ -49,12 +54,20 @@ DHTSensor dhtSensor;
 OLEDDisplay oledDisplay;
 RGBLEDHandler rgbLEDHandler(RGB_LED_RED_PIN, RGB_LED_GREEN_PIN, RGB_LED_BLUE_PIN);
 
-// Cloud Variables
-float pm1_0_val;
-float pm2_5_val;
-float pm10_0_val;
+// Sensor Mode Management
+enum SensorMode { 
+    MODE_AUTO,          // A - Initial mode (before 5s)
+    MODE_PASSIVE_INIT,  // P - Initial Passive command sent (unused in final logic)
+    MODE_READING,       // R - Reading actively for 20s
+    MODE_SLEEP          // S - Sleeping for 2 minutes
+};
+SensorMode currentSensorMode = MODE_AUTO; // Start in Auto Mode
 
-unsigned long lastSendTime = 0;
+unsigned long modeStartTime = 0;
+float pm1_0_val = 0.0;
+float pm2_5_val = 0.0;
+float pm10_0_val = 0.0;
+bool blynkSendPending = false; // Flag to ensure Blynk is sent exactly once per read cycle
 bool _otaInitialized = false; 
 
 // ----------------------------------------------------------------------
@@ -73,98 +86,154 @@ void setup() {
 
     // Initialize RGB LED
     rgbLEDHandler.setup();
-    // 🧹 NEW: Run the startup sequence to verify colors
     rgbLEDHandler.startupSequence();
 
-    // 2. Check for Power Cycle Reset (Must be run before Wi-Fi)
+    // 2. Check for Power Cycle Reset
     resetHandler.checkPowerCycles();
 
-    // 3. Initialize Wi-Fi (STARTS NON-BLOCKING STA CONNECT/AP ATTEMPT)
+    // 3. Initialize Wi-Fi
     oledDisplay.printMessage("WiFi", "Starting...");
     wifiHandler.startConnect();
 
-    // 4. Initialize Sensor Mock/Serial
+    // 4. Initialize Sensor Serial
     pmSensor.begin(SENSOR_BAUD_RATE);
     
     // 5. Initialize DHT22 Sensor
     dhtSensor.setup();
     
-    // 6. Record time after initial setup
-    firstRunTime = millis();
+    // Set initial mode start time
+    modeStartTime = millis();
 }
 
+/**
+ * @brief Maps the current SensorMode to a single character for display.
+ */
+String getSensorModeChar(SensorMode mode) {
+    switch (mode) {
+        case MODE_AUTO: return "A";
+        case MODE_PASSIVE_INIT: return "P";
+        case MODE_READING: return "R";
+        case MODE_SLEEP: return "S";
+        default: return "?";
+    }
+}
+
+/**
+ * @brief Manages the PMSensor state machine.
+ */
+void handleSensorState() {
+    unsigned long currentDuration = millis() - modeStartTime;
+    bool dataWasRead = false;
+    
+    switch (currentSensorMode) {
+        
+        // 1. MODE_AUTO: Initial state, waits for INITIAL_AUTO_DELAY_MS
+        case MODE_AUTO:
+            if (currentDuration >= INITIAL_AUTO_DELAY_MS) {
+                // Initializing Passive Mode and Standby
+                pmSensor.switchToPassiveMode();
+                pmSensor.enterStandbyMode();
+                currentSensorMode = MODE_SLEEP;
+                modeStartTime = millis();
+                Serial.println("--- State Change: AUTO -> SLEEP (Initial Passive Mode Set) ---");
+            }
+            break;
+
+        // 2. MODE_SLEEP: Sensor is asleep, waiting for SLEEP_DURATION_MS
+        case MODE_SLEEP:
+            if (currentDuration >= SLEEP_DURATION_MS) {
+                // Time to wake up and read
+                pmSensor.enterNormalMode(); // Wake up
+                pmSensor.switchToAutoMode(); // Switch to Auto mode to get continuous data
+                currentSensorMode = MODE_READING;
+                modeStartTime = millis();
+                blynkSendPending = true; // Signal that a Blynk send is needed this cycle
+                Serial.println("--- State Change: SLEEP -> READING (Waking up, switching to Auto mode) ---");
+            }
+            break;
+
+        // 3. MODE_READING: Sensor is active, reading data for ACTIVE_READ_DURATION_MS
+        case MODE_READING:
+            
+            // Check for new data packet
+            dataWasRead = pmSensor.readData(pm1_0_val, pm2_5_val, pm10_0_val, USE_MOCK_DATA);
+            
+            // --- STABILITY CHECK AND BLYNK TRIGGER ---
+            if (dataWasRead && blynkSendPending && (currentDuration >= STABILITY_TIME_MS)) {
+                // Data is fresh (dataWasRead), ready to send (blynkSendPending), and stable (past STABILITY_TIME_MS)
+                lastBlynkSendTime = 0; // Trigger Blynk send in loop()
+                blynkSendPending = false; // Clear flag until next sleep cycle
+                Serial.println("--- Stable Data Acquired. Triggering Blynk Send. ---");
+            }
+
+            if (currentDuration >= ACTIVE_READ_DURATION_MS) {
+                // Time to switch back to passive/standby
+                pmSensor.switchToPassiveMode(); 
+                pmSensor.enterStandbyMode();
+                currentSensorMode = MODE_SLEEP;
+                modeStartTime = millis();
+                Serial.println("--- State Change: READING -> SLEEP (Reading Complete) ---");
+            }
+            break;
+            
+        case MODE_PASSIVE_INIT:
+            break;
+    }
+}
+
+
 void loop() {
-    // 1. Handle Wi-Fi Connection State
+    // 1. Handle Sensor State Machine
+    handleSensorState();
+
+    // 2. Handle Wi-Fi Connection State
     wifiHandler.handleConnect();
 
     // Determine connection status based on Station (client) mode only
     bool currentlyConnected = (WiFi.status() == WL_CONNECTED && WiFi.getMode() == WIFI_STA);
 
-    // 2. Standby Mode Command Execution (5 seconds after start)
-    if (!standbyModeSet && (millis() - firstRunTime >= STANDBY_MODE_DELAY_MS)) {
-        pmSensor.enterStandbyMode();
-        standbyModeSet = true;
-    }
-
     // 3. OTA Handling (Skipped for brevity)
 
-    // 4. Blynk Data Transmission and Sensor Reading
-    if (millis() - lastSendTime > BLYNK_SEND_INTERVAL_MS) {
+    // 4. Blynk Data Transmission (Triggered by state machine via lastBlynkSendTime = 0)
+    // Send if a trigger occurred (lastBlynkSendTime == 0) AND connection is active
+    if (lastBlynkSendTime == 0) {
         
-        bool sensorDataAvailable = false;
-        
-        // --- WAKE UP, READ, and SLEEP Logic ---
-        if (standbyModeSet) {
-            // A. Wake up the sensor
-            pmSensor.enterNormalMode();
-            // B. Wait for stability (30 seconds recommended, but shortened for testing)
-            delay(3000); // 3 seconds delay for initial stability check
-            
-            // C. Read the data (assuming Auto mode now sends a burst of data)
-            sensorDataAvailable = pmSensor.readData(pm1_0_val, pm2_5_val, pm10_0_val, USE_MOCK_DATA);
-            
-            // D. Put the sensor back to sleep
-            pmSensor.enterStandbyMode();
-        } else {
-            // If standby hasn't been set yet (initial 5s window), just read continuously
-            sensorDataAvailable = pmSensor.readData(pm1_0_val, pm2_5_val, pm10_0_val, USE_MOCK_DATA);
-        }
-        
-        // --- DHT Reading (Unchanged) ---
+        bool sensorDataValid = (pm2_5_val > 0.0); // Check if we have received non-zero data
         float h = dhtSensor.readHumidity();
         float t = dhtSensor.readTemperature();
 
-        // Check if data is available and connected before sending
-        if (sensorDataAvailable && currentlyConnected) {
+        if (sensorDataValid && currentlyConnected) {
             // *** BLYNK UPDATE ***
             blynkHandler.sendData(BLYNK_AUTH_TOKEN, pm1_0_val, pm2_5_val, pm10_0_val, t, h);
-            lastSendTime = millis();
-        }
-        
-        // 5. Update Statuses and Display
-        String wifiStatusStr = wifiHandler.getWifiStatus();
-        rgbLEDHandler.updateLED(pm2_5_val, sensorDataAvailable);
-
-        oledDisplay.displaySensorDataAndWifiStatus(wifiStatusStr, pm1_0_val, pm2_5_val, pm10_0_val, h, t);
-
-        // 6. Serial Debug Output
-        if (sensorDataAvailable) {
-            Serial.print("Data Read (Mock="); Serial.print(USE_MOCK_DATA ? "T" : "F");
-            Serial.print("): PM2.5="); Serial.println(pm2_5_val);
+            lastBlynkSendTime = millis();
+            Serial.println("BLYNK: Stable data sent successfully.");
         } else {
-            Serial.println("PM sensor data not available.");
-        }
-            
-        if (!isnan(h) && !isnan(t)) {
-            String tempStr = "T: " + String(t, 1) + "C";
-            String humStr = "H: " + String(h, 0) + "%";
-            Serial.println(tempStr);
-            Serial.println(humStr);
-        } else {
-            Serial.println("DHT Sensor read failed.");
+            // If send was triggered but connection/data failed, log it and prevent immediate re-trigger
+            // Setting a non-zero value prevents immediate re-trigger, the state machine will handle the next cycle
+            lastBlynkSendTime = millis(); 
+            Serial.println("BLYNK: Send triggered, but skipping (Wi-Fi or data error).");
         }
     }
     
-    // 7. Loop Delay
+    // 5. Read DHT Data (Run every loop to get the latest values for display)
+    float h = dhtSensor.readHumidity();
+    float t = dhtSensor.readTemperature();
+
+    // 6. Update Statuses and Display
+    String wifiStatusStr = wifiHandler.getWifiStatus();
+    
+    rgbLEDHandler.updateLED(pm2_5_val, currentSensorMode != MODE_SLEEP); // LED reflects active/sleep state
+    
+    // Call the updated OLED function
+    oledDisplay.displaySensorDataAndWifiStatus(getSensorModeChar(currentSensorMode), wifiStatusStr, pm1_0_val, pm2_5_val, pm10_0_val, h, t);
+
+    // 7. Serial Debug Output (Simplified)
+    if (currentSensorMode != MODE_SLEEP) {
+        Serial.print("PM2.5: "); Serial.println(pm2_5_val);
+    }
+    if (!isnan(h) && !isnan(t)) {
+        Serial.print("T/H: "); Serial.print(t, 1); Serial.print("C / "); Serial.print(h, 0); Serial.println("%");
+    }
+    
     delay(LOOP_DELAY);
 }
