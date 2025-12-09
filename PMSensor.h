@@ -33,15 +33,49 @@ public:
      */
     bool readData(float& pm1_0, float& pm2_5, float& pm10_0, bool useMockData);
 
+    // --- UART Command Functions ---
+    /**
+     * @brief Sends command to switch sensor to passive output mode.
+     * In this mode, the MCU must request data using requestData().
+     */
+    void switchToPassiveMode();
+
+    /**
+     * @brief Sends command to switch sensor to auto output mode.
+     * In this mode, the sensor automatically sends data every 1 second.
+     */
+    void switchToAutoMode();
+
+    /**
+     * @brief Sends command to enter standby (sleep) mode.
+     * Turns off fan and laser for power saving.
+     */
+    void enterStandbyMode();
+
+    /**
+     * @brief Sends command to enter normal working mode (wakes up).
+     * Note: Takes >30s for stable readings after waking.
+     */
+    void enterNormalMode();
+    
+    /**
+     * @brief Sends command to request data in passive mode.
+     */
+    void requestData();
+
 private:
     SoftwareSerial _pmSerial;
     pms5003data* _data;
+    
+    /**
+     * @brief Helper function to calculate and send a generic 7-byte command.
+     * @param cmd Command byte (0xE1, 0xE2, or 0xE4).
+     * @param dataL Data low byte (0x00 or 0x01).
+     */
+    void sendCommand(byte cmd, byte dataL);
 
     bool readPmsData();
-
     bool readSensorPacket();
-    
-    // Generates random numbers for testing
     void generateMockData(float& pm1_0, float& pm2_5, float& pm10_0);
 };
 
