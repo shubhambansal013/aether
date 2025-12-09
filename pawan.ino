@@ -25,9 +25,9 @@ const bool USE_MOCK_DATA = false;
 
 // --- Reading Cycle Constants (All Configurable) ---
 const unsigned long INITIAL_AUTO_DELAY_MS = 5000L;    // 1. Initial 5s delay before Passive Mode (X=5s)
-const unsigned long ACTIVE_READ_DURATION_MS = 20000L; // 2. Total reading duration after wake-up (20s)
+const unsigned long ACTIVE_READ_DURATION_MS = 5000L; // 2. Total reading duration after wake-up (20s)
 const unsigned long STABILITY_TIME_MS = 5000L;        // 3. Time required for data to stabilize after wake-up (5s)
-const unsigned long SLEEP_DURATION_MS = 120000L;      // 4. Sleep duration (2 minutes = 120s)
+const unsigned long SLEEP_DURATION_MS = 5000L;      // 4. Sleep duration (2 minutes = 120s)
 
 // --- Loop delay ---
 const long LOOP_DELAY = 1000;
@@ -96,6 +96,14 @@ void setup() {
     // 4. Initialize Sensor Serial
     pmSensor.begin(SENSOR_BAUD_RATE);
     
+    // --- CRITICAL FIX FOR COLD START FAN ISSUE ---
+    // The sensor may ignore the first command after a cold boot. 
+    // Send the Normal Mode command here to ensure the fan starts spinning immediately.
+    pmSensor.enterNormalMode(); 
+    pmSensor.switchToAutoMode(); // Ensure it starts in Auto mode for the 5s window
+    delay(10); // Give the sensor a tiny moment to process the command
+    // ---------------------------------------------
+    
     // 5. Initialize DHT22 Sensor
     dhtSensor.setup();
     
@@ -127,16 +135,16 @@ void handleSensorState() {
         
         // 1. MODE_AUTO: Initial state, waits for INITIAL_AUTO_DELAY_MS
         case MODE_AUTO:
-            // Read data during the initial period for display
+            // Read data during the initial period for display (Fan is running from setup())
             pmSensor.readData(pm1_0_val, pm2_5_val, pm10_0_val, USE_MOCK_DATA);
             
             if (currentDuration >= INITIAL_AUTO_DELAY_MS) {
-                // Initialize Passive Mode and Standby for the cycle
+                // Time to transition to the optimal sleep cycle
                 pmSensor.switchToPassiveMode(); 
                 pmSensor.enterStandbyMode();    
                 currentSensorMode = MODE_SLEEP;
                 modeStartTime = millis();
-                Serial.println("--- State Change: AUTO -> SLEEP (Initial Passive Mode Set) ---");
+                Serial.println("--- State Change: AUTO -> SLEEP (Initial Passive/Standby Set) ---");
             }
             break;
 
@@ -145,16 +153,14 @@ void handleSensorState() {
             if (currentDuration >= SLEEP_DURATION_MS) {
                 // Time to wake up and read
                 
-                // --- CRITICAL WAKE-UP SEQUENCE ---
+                // --- WAKE-UP SEQUENCE ---
                 pmSensor.enterNormalMode(); // Sends Wake Up command (Fan/Laser starts)
-                // Short delay to ensure command transmission completes
                 delay(10); 
-                // Switch to Auto Mode: Fan should be spinning and sensor broadcasting data.
-                pmSensor.switchToAutoMode(); 
+                pmSensor.switchToAutoMode(); // Switch to Auto Mode to start broadcasting data
                 
                 currentSensorMode = MODE_READING;
                 modeStartTime = millis();
-                blynkSendPending = true; // Signal that a Blynk send is needed this cycle
+                blynkSendPending = true; 
                 Serial.println("--- State Change: SLEEP -> READING (Waking up, switching to Auto Mode) ---");
             }
             break;
@@ -162,7 +168,7 @@ void handleSensorState() {
         // 3. MODE_READING: Sensor is active, constantly reading broadcast data
         case MODE_READING:
             
-            // Check for new data packet received (Sensor is broadcasting in Auto Mode)
+            // Check for new data packet received
             dataWasRead = pmSensor.readData(pm1_0_val, pm2_5_val, pm10_0_val, USE_MOCK_DATA);
             
             // --- STABILITY CHECK AND BLYNK TRIGGER ---
