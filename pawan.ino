@@ -15,12 +15,9 @@
 // ----------------------------------------------------------------------
 // ⚙️ FIRMWARE VERSION & SYSTEM CONSTANTS
 // ----------------------------------------------------------------------
-const char* FIRMWARE_VERSION = "V1.0.10 - OLED Fix";
+const char* FIRMWARE_VERSION = "V1.1.0 - WS2812 Update";
 const long DEBUG_BAUD_RATE = 115200;
 const int SETUP_DELAY_MS = 100;
-
-// --- Wi-Fi Connection Constants ---
-// Constants removed as they are no longer used by WiFiHandler.
 
 // --- Sensor Constants ---
 const long SENSOR_BAUD_RATE = 9600;
@@ -29,13 +26,11 @@ const bool USE_MOCK_DATA = false;
 
 // --- Loop delay ---
 const long LOOP_DELAY = 1000;
-// ----------------------------------------------------------------------
 
-// --- OTA Update Constants (Unchanged) ---
+// --- OTA Update Constants ---
 const char* GITHUB_REPO_USER = "shubhambansal013";
 const char* GITHUB_REPO_NAME = "pawan";
 const char* FIRMWARE_BIN_NAME = "firmware.bin";
-// ----------------------------------------------------------------------
 
 // --- Global Variables/Instances ---
 WiFiHandler wifiHandler;
@@ -45,7 +40,9 @@ BlynkHandler blynkHandler;
 OTAHandler otaHandler(FIRMWARE_VERSION, GITHUB_REPO_USER, GITHUB_REPO_NAME, FIRMWARE_BIN_NAME);
 DHTSensor dhtSensor;
 OLEDDisplay oledDisplay;
-RGBLEDHandler rgbLEDHandler(RGB_LED_RED_PIN, RGB_LED_GREEN_PIN, RGB_LED_BLUE_PIN);
+
+// UPDATED: Now uses single WS2812_DATA_PIN instead of R, G, B pins
+RGBLEDHandler rgbLEDHandler(WS2812_DATA_PIN);
 
 // Cloud Variables
 float pm1_0_val;
@@ -65,64 +62,46 @@ void setup() {
     Serial.print("\nFirmware Version: ");
     Serial.println(FIRMWARE_VERSION);
 
-    // 1. Initialize OLED Display FIRST to show status during boot
+    // 1. Initialize OLED Display FIRST
     oledDisplay.setup();
     oledDisplay.printMessage("System", "Booting...");
 
-    // Initialize RGB LED
+    // 2. Initialize WS2812 LED
     rgbLEDHandler.setup();
-    // 🧹 NEW: Run the startup sequence to verify colors
-    rgbLEDHandler.startupSequence();
+    rgbLEDHandler.startupSequence(); // Confirms R->G->B connectivity
 
-    // 2. Check for Power Cycle Reset (Must be run before Wi-Fi)
+    // 3. Check for Power Cycle Reset
     resetHandler.checkPowerCycles();
 
-    // 3. Initialize Wi-Fi (STARTS NON-BLOCKING STA CONNECT/AP ATTEMPT)
+    // 4. Initialize Wi-Fi
     oledDisplay.printMessage("WiFi", "Starting...");
     wifiHandler.startConnect();
 
-    // 4. Initialize Sensor Mock/Serial
+    // 5. Initialize Sensors
     pmSensor.begin(SENSOR_BAUD_RATE);
-
-    // 5. Initialize DHT22 Sensor
     dhtSensor.setup();
 }
 
 void loop() {
     // 1. Handle Wi-Fi Connection State
     wifiHandler.handleConnect();
-
-    // Determine connection status based on Station (client) mode only
     bool currentlyConnected = (WiFi.status() == WL_CONNECTED && WiFi.getMode() == WIFI_STA);
 
-    // 2. OTA Initialization and Handling (Logic commented out, but structures kept)
-    // if (currentlyConnected && !_otaInitialized) {
-    //     Serial.println("Wi-Fi connected successfully! Initializing OTA...");
-    //     otaHandler.setupArduinoOTA();
-    //     _otaInitialized = true;
-    // }
-    // if (_otaInitialized) {
-    //     otaHandler.handleArduinoOTA();
-    // }
-
-    // 3. Read Sensor Data (Runs every loop regardless of WiFi status)
+    // 2. Read Sensor Data
     bool sensorDataAvailable = pmSensor.readData(pm1_0_val, pm2_5_val, pm10_0_val, USE_MOCK_DATA);
     float h = dhtSensor.readHumidity();
     float t = dhtSensor.readTemperature();
 
-    // 4. Update Statuses and Display
-    String wifiStatusStr = wifiHandler.getWifiStatus();
-    
-    // 🧹 UPDATE: Simplified call to updateLED, only passing PM2.5 and sensor status
+    // 3. Update LED (Simplified immediate update)
     rgbLEDHandler.updateLED(pm2_5_val, sensorDataAvailable);
 
-    // Always attempt to display PM data, and DHT data if available
+    // 4. Update OLED Display
+    String wifiStatusStr = wifiHandler.getWifiStatus();
     oledDisplay.displaySensorDataAndWifiStatus(wifiStatusStr, pm1_0_val, pm2_5_val, pm10_0_val, h, t);
 
     // 5. Blynk Data Transmission
     if (millis() - lastSendTime > BLYNK_SEND_INTERVAL_MS) {
         if (sensorDataAvailable && currentlyConnected) {
-            // *** BLYNK UPDATE ***
             blynkHandler.sendData(BLYNK_AUTH_TOKEN, pm1_0_val, pm2_5_val, pm10_0_val, t, h);
             lastSendTime = millis();
         }
@@ -130,20 +109,8 @@ void loop() {
     
     // 6. Serial Debug Output
     if (sensorDataAvailable) {
-        Serial.print("Data Read (Mock="); Serial.print(USE_MOCK_DATA ? "T" : "F");
-        Serial.print("): PM2.5="); Serial.println(pm2_5_val);
-    } else {
-        Serial.println("PM sensor data not available.");
+        Serial.print("PM2.5: "); Serial.println(pm2_5_val);
     }
         
-    if (!isnan(h) && !isnan(t)) {
-        String tempStr = "T: " + String(t, 1) + "C";
-        String humStr = "H: " + String(h, 0) + "%";
-        Serial.println(tempStr);
-        Serial.println(humStr);
-    } else {
-        Serial.println("DHT Sensor read failed.");
-    }
-    
     delay(LOOP_DELAY);
 }
