@@ -89,19 +89,19 @@ long RGBLEDHandler::getAqiHexColor(float pm2_5_val, bool sensorDataAvailable) {
         return COLOR_SENSOR_ERROR;
     } 
 
-    // Official Indian CPCB PM2.5 24-hour breakpoints (ug/m3)
+    // Indian CPCB PM2.5 24-hour breakpoints (ug/m3)
     if (pm2_5_val > 250.0) {
-        return COLOR_SEVERE;          // > 250: Severe
+        return COLOR_HAZARDOUS;           // Matches "Severe" (> 250)
     } else if (pm2_5_val > 120.0) {
-        return COLOR_VERY_POOR;       // 121 - 250: Very Poor
+        return COLOR_VERY_UNHEALTHY;      // Matches "Very Poor" (121 - 250)
     } else if (pm2_5_val > 90.0) {
-        return COLOR_POOR;            // 91 - 120: Poor
+        return COLOR_UNHEALTHY;           // Matches "Poor" (91 - 120)
     } else if (pm2_5_val > 60.0) {
-        return COLOR_MODERATE;        // 61 - 90: Moderately Polluted
+        return COLOR_UNHEALTHY_SENSITIVE; // Matches "Moderate" (61 - 90)
     } else if (pm2_5_val > 30.0) {
-        return COLOR_SATISFACTORY;    // 31 - 60: Satisfactory
+        return COLOR_MODERATE;            // Matches "Satisfactory" (31 - 60)
     } else { 
-        return COLOR_GOOD;            // 0 - 30: Good
+        return COLOR_GOOD;                // Matches "Good" (0 - 30)
     }
 }
 
