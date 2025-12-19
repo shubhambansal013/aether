@@ -17,15 +17,16 @@ public:
     void clear();
     void printMessage(String line1, String line2);
 
-    // FIXED: Added int remainingSeconds (Total 9 arguments)
     void update(String wifiStatus, float pm1_0, float pm2_5, float pm10_0, 
-                float temp, float hum, bool isWarmup, bool isSleeping, int remainingSeconds);
+            float temp, float hum, bool isWarmup, bool isSleeping, 
+            int remainingSeconds, bool isBlynkUpdating); // Added flag here
 
 private:
     Adafruit_SSD1306 display;
     
     // FIXED: Added int countdown
-    void drawStatusBar(String wifiStatus, bool isWarmup, bool isSleeping, int countdown);
+    void drawStatusBar(String wifiStatus, bool isWarmup, bool isSleeping, 
+                   int countdown, bool showBlynk);
     void drawHeroSection(float pm2_5);
     void drawSecondaryGrid(float pm1_0, float pm10_0, float temp, float hum);
     
