@@ -1,48 +1,64 @@
-// PMSensor.h
-
 #ifndef PMSENSOR_H
 #define PMSENSOR_H
 
 #include <Arduino.h>
 #include <SoftwareSerial.h>
 
-// Forward declaration
-struct pms5003data;
-
 class PMSensor {
 public:
     /**
      * @brief Constructor.
      * @param rxPin RX pin for the sensor (connects to sensor TX).
-     * @param txPin TX pin for the sensor (connects to sensor RX).
+     * @param setPin SET pin for the sensor (Hardware Sleep/Wake).
      */
-    PMSensor(int rxPin, int txPin);
+    PMSensor(int rxPin, int setPin);
 
     /**
-     * @brief Initializes SoftwareSerial communication.
+     * @brief Initializes GPIOs and SoftwareSerial communication.
      */
-    void begin(long baudRate);
+    void begin(long baudRate = 9600);
 
     /**
-     * @brief Reads data from the sensor (Mock or Real).
-     * @param pm1_0 Reference to update PM 1.0 variable.
-     * @param pm2_5 Reference to update PM 2.5 variable.
-     * @param pm10_0 Reference to update PM 10.0 variable.
-     * @param useMockData If true, generates random data; otherwise, reads serial.
-     * @return true if data was successfully obtained, false otherwise.
+     * @brief Hardware-level sleep (Pulls SET pin LOW).
      */
-    bool readData(float& pm1_0, float& pm2_5, float& pm10_0, bool useMockData);
+    void sleep();
+
+    /**
+     * @brief Hardware-level wakeup (Pulls SET pin HIGH).
+     */
+    void wakeup();
+
+    /**
+     * @brief Flushes the serial buffer to ensure fresh data.
+     */
+    void clearBuffer();
+
+    /**
+     * @brief Reads data from the sensor stream and verifies integrity.
+     * @return true if a valid 32-byte packet was parsed and checksum passed.
+     */
+    bool readData(float& pm1_0, float& pm2_5, float& pm10_0);
 
 private:
     SoftwareSerial _pmSerial;
-    pms5003data* _data;
+    int _setPin;
 
-    bool readPmsData();
-
-    bool readSensorPacket();
+    // --- Private Helper Methods (Matches the refactored .cpp) ---
     
-    // Generates random numbers for testing
-    void generateMockData(float& pm1_0, float& pm2_5, float& pm10_0);
+    /**
+     * @brief Searches the serial stream for the 0x42 0x4D start sequence.
+     */
+    bool findHeader();
+
+    /**
+     * @brief Calculates and verifies the checksum for the 32-byte packet.
+     */
+    bool isValidChecksum(byte* buffer, int length);
+
+    /**
+     * @brief Extracts specific PM values from the validated buffer.
+     */
+    void parseBuffer(byte* buffer, float& pm1_0, float& pm2_5, float& pm10_0);
 };
 
 #endif
