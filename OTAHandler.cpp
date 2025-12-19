@@ -1,158 +1,110 @@
+#include "OLEDDisplay.h"
+#include "pins.h"
+#include <Wire.h>
 
-// OTAHandler.cpp
-#include "OTAHandler.h"
-#include <ESP8266HTTPClient.h>
-#include <ESP8266httpUpdate.h>
-#include <ArduinoJson.h> // For parsing GitHub API response
-#include <ESP8266WiFi.h> // Required for WiFi.localIP() and ArduinoOTA
+#define SSD1306_SETCONTRAST 0x81
+#define SCREEN_ADDRESS 0x3C
 
-// Constructor
-OTAHandler::OTAHandler(const char* currentVersion, const char* repoUser, const char* repoName, const char* firmwareFile)
-    : _currentVersion(currentVersion),
-      _repoUser(repoUser),
-      _repoName(repoName),
-      _firmwareFile(firmwareFile) {
-    _repoApiUrl = "https://api.github.com/repos/";
-    _repoApiUrl += _repoUser;
-    _repoApiUrl += "/";
-    _repoApiUrl += _repoName;
+OLEDDisplay::OLEDDisplay() : display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET) {}
+
+void OLEDDisplay::setup() {
+    Wire.begin(OLED_SDA_PIN, OLED_SCL_PIN); 
+    if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) { 
+        Serial.println(F("SSD1306 allocation failed"));
+        for (;;); 
+    }
+    setBrightness(DEFAULT_OLED_BRIGHTNESS); 
+    display.clearDisplay();
+    display.display();
 }
 
-// --- ArduinoOTA Methods ---
+void OLEDDisplay::update(String wifiStatus, float pm1_0, float pm2_5, float pm10_0, 
+                         float temp, float hum, bool isWarmup, bool isSleeping) {
+    display.clearDisplay();
+    display.setTextColor(SSD1306_WHITE);
 
-void OTAHandler::setupArduinoOTA() {
-    ArduinoOTA.onStart([]() {
-        String type;
-        if (ArduinoOTA.getCommand() == U_FLASH) {
-            type = "sketch";
-        } else { // U_SPIFFS
-            type = "filesystem";
-        }
-        // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
-        Serial.println("Start updating " + type);
-    });
-    ArduinoOTA.onEnd([]() {
-        Serial.println("\nEnd");
-    });
-    ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-        Serial.printf("Progress: %u%%\r", (progress / (1000.0 * 10.0)));
-    });
-    ArduinoOTA.onError([](ota_error_t error) {
-        Serial.printf("Error[%u]: ", error);
-        if (error == OTA_AUTH_ERROR) {
-            Serial.println("Auth Failed");
-        } else if (error == OTA_BEGIN_ERROR) {
-            Serial.println("Begin Failed");
-        } else if (error == OTA_CONNECT_ERROR) {
-            Serial.println("Connect Failed");
-        } else if (error == OTA_RECEIVE_ERROR) {
-            Serial.println("Receive Failed");
-        } else if (error == OTA_END_ERROR) {
-            Serial.println("End Failed");
-        }
-    });
+    drawStatusBar(wifiStatus, isWarmup, isSleeping);
+    drawHeroSection(pm2_5);
+    drawSecondaryGrid(pm1_0, pm10_0, temp, hum);
 
-    // Hostname defaults to esp8266-[ChipID]
-    // Set a custom hostname to make it easier to find on the network
-    ArduinoOTA.setHostname("airmon-esp8266");
-
-    ArduinoOTA.begin();
-    Serial.println("ArduinoOTA Initialized.");
-    Serial.print("IP address: ");
-    Serial.println(WiFi.localIP());
+    display.display();
 }
 
-void OTAHandler::handleArduinoOTA() {
-    ArduinoOTA.handle();
+void OLEDDisplay::drawStatusBar(String wifiStatus, bool isWarmup, bool isSleeping) {
+    drawModeIcon(0, 0, isWarmup);
+    drawFanIcon(15, 0, (isWarmup || !isSleeping));
+    drawWifiIcon(SCREEN_WIDTH - 9, 1, wifiStatus);
+    
+    display.setTextSize(1);
+    display.setCursor(35, 1);
+    
+    if (wifiStatus.indexOf("AP Config") >= 0) display.print("SETUP AP");
+    else if (isWarmup) display.print("WARMUP");
+    else if (isSleeping) display.print("IDLE");
+    else display.print("ACTIVE");
+
+    display.drawFastHLine(0, 11, SCREEN_WIDTH, SSD1306_WHITE);
 }
 
-// --- GitHub-based OTA Methods (existing) ---
+void OLEDDisplay::drawHeroSection(float pm2_5) {
+    display.setTextSize(1);
+    display.setCursor(0, 18);
+    display.print("PM 2.5");
 
-// Get the latest version tag from GitHub releases
-String OTAHandler::getLatestVersionTag() {
-    Serial.println("Checking for latest firmware version on GitHub...");
-    String latestVersion = "";
-    HTTPClient http;
-    String url = _repoApiUrl + "/releases/latest";
+    display.setTextSize(3);
+    String val = (pm2_5 < 0) ? "---" : String((int)pm2_5);
+    int16_t x1, y1; uint16_t w, h;
+    display.getTextBounds(val, 0, 0, &x1, &y1, &w, &h);
+    display.setCursor(SCREEN_WIDTH - w, 15);
+    display.print(val);
+}
 
-    WiFiClient client;
-    http.begin(client, url);
-    int httpCode = http.GET();
+void OLEDDisplay::drawSecondaryGrid(float pm1_0, float pm10_0, float temp, float hum) {
+    display.drawFastHLine(0, 40, SCREEN_WIDTH, SSD1306_WHITE);
+    display.setTextSize(1);
 
-    if (httpCode == HTTP_CODE_OK) {
-        String payload = http.getString();
-        Serial.println("GitHub API Response:");
-        Serial.println(payload);
+    display.setCursor(0, 44);
+    display.print("P1:"); display.print((int)pm1_0);
+    display.setCursor(64, 44);
+    display.print("P10:"); display.print((int)pm10_0);
 
-        DynamicJsonDocument doc(1024); // Adjust size as needed
-        DeserializationError error = deserializeJson(doc, payload);
+    display.setCursor(0, 56);
+    display.print("T:"); display.print(temp, 1); display.print("C");
+    display.setCursor(64, 56);
+    display.print("H:"); display.print((int)hum); display.print("%");
+}
 
-        if (error) {
-            Serial.print(F("deserializeJson() failed: "));
-            Serial.println(error.f_str());
-        } else {
-            latestVersion = doc["tag_name"].as<String>();
-            Serial.print("Latest version found: ");
-            Serial.println(latestVersion);
-        }
+void OLEDDisplay::drawWifiIcon(int16_t x, int16_t y, String status) {
+    if (status.indexOf("Connected") >= 0) {
+        display.fillRect(x, y+6, 2, 2, SSD1306_WHITE);
+        display.fillRect(x+3, y+3, 2, 5, SSD1306_WHITE);
+        display.fillRect(x+6, y, 2, 8, SSD1306_WHITE);
     } else {
-        Serial.printf("HTTP GET failed, error: %s\n", http.errorToString(httpCode).c_str());
-    }
-    http.end();
-    return latestVersion;
-}
-
-// Perform the OTA update
-void OTAHandler::performUpdate(const String& latestVersionTag) {
-    Serial.println("Performing OTA update...");
-    String firmwareUrl = "https://github.com/";
-    firmwareUrl += _repoUser;
-    firmwareUrl += "/";
-    firmwareUrl += _repoName;
-    firmwareUrl += "/releases/download/";
-    firmwareUrl += latestVersionTag;
-    firmwareUrl += "/";
-    firmwareUrl += _firmwareFile;
-
-    Serial.print("Firmware URL: ");
-    Serial.println(firmwareUrl);
-
-    WiFiClient client;
-    t_httpUpdate_return ret = ESPhttpUpdate.update(client, firmwareUrl, _currentVersion);
-
-    switch (ret) {
-        case HTTP_UPDATE_FAILED:
-            Serial.printf("HTTP_UPDATE_FAILED Error (%d): %s\n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
-            break;
-        case HTTP_UPDATE_NO_UPDATES:
-            Serial.println("HTTP_UPDATE_NO_UPDATES");
-            break;
-        case HTTP_UPDATE_OK:
-            Serial.println("HTTP_UPDATE_OK");
-            break;
+        display.drawLine(x, y, x+7, y+7, SSD1306_WHITE);
+        display.drawLine(x+7, y, x, y+7, SSD1306_WHITE);
     }
 }
 
-// Check for updates and perform if available
-void OTAHandler::checkAndUpdate() {
-    String latestVersionTag = getLatestVersionTag();
+void OLEDDisplay::drawModeIcon(int16_t x, int16_t y, bool isWarmup) {
+    display.drawRect(x, y, 11, 9, SSD1306_WHITE);
+    display.setCursor(x + 3, y + 1);
+    display.print(isWarmup ? "A" : "P");
+}
 
-    if (latestVersionTag.length() > 0) {
-        // Simple string comparison for version.
-        // For more robust version comparison (e.g., v1.0.9 vs v1.0.10),
-        // a dedicated version parsing function would be needed.
-        // For now, assuming lexicographical comparison is sufficient or versions are simple.
-        if (latestVersionTag.compareTo(_currentVersion) > 0) {
-            Serial.print("New firmware available: ");
-            Serial.print(latestVersionTag);
-            Serial.print(" (Current: ");
-            Serial.print(_currentVersion);
-            Serial.println(")");
-            performUpdate(latestVersionTag);
-        } else {
-            Serial.println("No new firmware available.");
-        }
+void OLEDDisplay::drawFanIcon(int16_t x, int16_t y, bool isFanOn) {
+    if (!isFanOn) {
+        display.drawCircle(x+4, y+4, 3, SSD1306_WHITE);
     } else {
-        Serial.println("Could not retrieve latest version tag.");
+        static float angle = 0;
+        angle += 0.6; 
+        int8_t x_off = cos(angle) * 3;
+        int8_t y_off = sin(angle) * 3;
+        display.drawLine(x+4-x_off, y+4-y_off, x+4+x_off, y+4+y_off, SSD1306_WHITE);
+        display.drawLine(x+4+y_off, y+4-x_off, x+4-y_off, y+4+x_off, SSD1306_WHITE);
     }
 }
+
+void OLEDDisplay::setBrightness(uint8_t contrast_value) { setOLEDContrast(contrast_value); display.display(); }
+void OLEDDisplay::setOLEDContrast(uint8_t value) { Wire.beginTransmission(SCREEN_ADDRESS); Wire.write(0x00); Wire.write(SSD1306_SETCONTRAST); Wire.write(value); Wire.endTransmission(); }
+void OLEDDisplay::clear() { display.clearDisplay(); display.display(); }
+void OLEDDisplay::printMessage(String l1, String l2) { display.clearDisplay(); display.setTextSize(2); display.setCursor(0,0); display.println(l1); display.setTextSize(1); display.setCursor(0,20); display.println(l2); display.display(); }
