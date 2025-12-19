@@ -11,14 +11,14 @@
 #include "RGBLEDHandler.h"
 
 // --- Constants & Firmware Info ---
-const char* FIRMWARE_VERSION = "V1.2.5 - HW Cycle Clean";
-const unsigned long INITIAL_WARMUP_DURATION = 300000; // 5 mins
-const unsigned long PM_WAKE_DURATION = 30000;         // 30s wake
-const unsigned long PM_SLEEP_DURATION = 120000;       // 2 mins sleep
-const unsigned long BLYNK_SEND_INTERVAL = 60000;      // 1 min throttle
-const unsigned long STABILITY_THRESHOLD = 15000;      // 15s stable wait
+const char* FIRMWARE_VERSION = "V1.2.6 - Debug Enhanced";
+const unsigned long INITIAL_WARMUP_DURATION = 300000; 
+const unsigned long PM_WAKE_DURATION = 30000;         
+const unsigned long PM_SLEEP_DURATION = 120000;       
+const unsigned long BLYNK_SEND_INTERVAL = 60000;      
+const unsigned long STABILITY_THRESHOLD = 15000;      
 
-// --- Global Instances ---
+// --- Global State ---
 WiFiHandler wifiHandler;
 ResetHandler resetHandler(wifiHandler);
 PMSensor pmSensor(PM_SENSOR_RX_PIN, PM_SENSOR_SET_PIN); 
@@ -27,7 +27,6 @@ DHTSensor dhtSensor;
 OLEDDisplay oledDisplay;
 RGBLEDHandler rgbLEDHandler(RGB_LED_RED_PIN, RGB_LED_GREEN_PIN, RGB_LED_BLUE_PIN);
 
-// --- Global State ---
 float pm1_0_val, pm2_5_val, pm10_0_val, temp_val, hum_val;
 unsigned long lastBlynkSend = 0;
 unsigned long stateTimer = 0;
@@ -39,6 +38,8 @@ bool isDataFresh = false;
 
 void setup() {
     Serial.begin(115200);
+    Serial.println("\n\n--- System Booting ---");
+    Serial.printf("Firmware: %s\n", FIRMWARE_VERSION);
     
     oledDisplay.setup();
     rgbLEDHandler.setup();
@@ -52,6 +53,7 @@ void setup() {
 
     bootTime = millis();
     stateTimer = millis();
+    Serial.println("Initial 5-minute warmup started...");
 }
 
 void loop() {
@@ -65,29 +67,25 @@ void loop() {
     delay(1000); 
 }
 
-// ----------------------------------------------------------------------
-// 🛠️ REFACTORED METHODS
-// ----------------------------------------------------------------------
-
 void handlePMSensor() {
     unsigned long currentMillis = millis();
     unsigned long timeInState = currentMillis - stateTimer;
 
     if (isInitialWarmup) {
-        bool success = pmSensor.readData(pm1_0_val, pm2_5_val, pm10_0_val);
-        if (success) {
+        if (pmSensor.readData(pm1_0_val, pm2_5_val, pm10_0_val)) {
+            Serial.printf("[WARMUP] PM1.0: %.0f | PM2.5: %.0f | PM10: %.0f\n", pm1_0_val, pm2_5_val, pm10_0_val);
             rgbLEDHandler.updateLED(pm2_5_val, true);
             if (currentMillis - bootTime > STABILITY_THRESHOLD) isDataFresh = true;
         }
         if (currentMillis - bootTime >= INITIAL_WARMUP_DURATION) {
             isInitialWarmup = false;
             stateTimer = currentMillis;
-            Serial.println("Warmup complete. Entering cycle mode.");
+            Serial.println(">> WARMUP COMPLETE. Switching to power-save cycles.");
         }
     } 
     else if (sensorIsAwake) {
-        bool success = pmSensor.readData(pm1_0_val, pm2_5_val, pm10_0_val);
-        if (success) {
+        if (pmSensor.readData(pm1_0_val, pm2_5_val, pm10_0_val)) {
+            Serial.printf("[ACTIVE] PM1.0: %.0f | PM2.5: %.0f | PM10: %.0f\n", pm1_0_val, pm2_5_val, pm10_0_val);
             rgbLEDHandler.updateLED(pm2_5_val, true);
             if (timeInState > STABILITY_THRESHOLD) isDataFresh = true;
         }
@@ -95,10 +93,17 @@ void handlePMSensor() {
             pmSensor.sleep();
             sensorIsAwake = false;
             stateTimer = currentMillis;
+            Serial.println(">> SENSOR SLEEPING: Hardware standby initiated.");
         }
     } 
     else {
+        // Logging sleep progress every 30s
+        if (timeInState % 30000 < 1000) { 
+            Serial.printf(">> SENSOR ASLEEP: %lus remaining...\n", (PM_SLEEP_DURATION - timeInState) / 1000);
+        }
+
         if (timeInState >= PM_SLEEP_DURATION) {
+            Serial.println(">> SENSOR WAKING: Restarting fan and laser...");
             pmSensor.wakeup();
             pmSensor.clearBuffer();
             sensorIsAwake = true;
@@ -124,10 +129,14 @@ void handleCloudUpdates() {
     unsigned long now = millis();
     bool connected = (WiFi.status() == WL_CONNECTED && WiFi.getMode() == WIFI_STA);
 
-    if (connected && (now - lastBlynkSend > BLYNK_SEND_INTERVAL) && isDataFresh) {
-        blynkHandler.sendData(BLYNK_AUTH_TOKEN, pm1_0_val, pm2_5_val, pm10_0_val, temp_val, hum_val);
-        lastBlynkSend = now;
-        isDataFresh = false; 
-        Serial.println("Blynk: Stable Data Sent.");
+    if (connected && (now - lastBlynkSend > BLYNK_SEND_INTERVAL)) {
+        if (isDataFresh) {
+            Serial.println(">> BLYNK: Sending stable PM and DHT data...");
+            blynkHandler.sendData(BLYNK_AUTH_TOKEN, pm1_0_val, pm2_5_val, pm10_0_val, temp_val, hum_val);
+            lastBlynkSend = now;
+            isDataFresh = false; 
+        } else {
+            Serial.println(">> BLYNK: Waiting for data stability...");
+        }
     }
 }
