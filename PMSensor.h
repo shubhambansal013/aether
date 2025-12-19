@@ -1,48 +1,47 @@
-// PMSensor.h
-
 #ifndef PMSENSOR_H
 #define PMSENSOR_H
 
 #include <Arduino.h>
 #include <SoftwareSerial.h>
 
-// Forward declaration
-struct pms5003data;
-
 class PMSensor {
 public:
     /**
      * @brief Constructor.
      * @param rxPin RX pin for the sensor (connects to sensor TX).
-     * @param txPin TX pin for the sensor (connects to sensor RX).
+     * @param setPin SET pin for the sensor (Hardware Sleep/Wake).
      */
-    PMSensor(int rxPin, int txPin);
+    PMSensor(int rxPin, int setPin);
 
     /**
-     * @brief Initializes SoftwareSerial communication.
+     * @brief Initializes GPIOs and SoftwareSerial communication.
      */
-    void begin(long baudRate);
+    void begin(long baudRate = 9600);
 
     /**
-     * @brief Reads data from the sensor (Mock or Real).
-     * @param pm1_0 Reference to update PM 1.0 variable.
-     * @param pm2_5 Reference to update PM 2.5 variable.
-     * @param pm10_0 Reference to update PM 10.0 variable.
-     * @param useMockData If true, generates random data; otherwise, reads serial.
-     * @return true if data was successfully obtained, false otherwise.
+     * @brief Hardware-level sleep (Pulls SET pin LOW).
      */
-    bool readData(float& pm1_0, float& pm2_5, float& pm10_0, bool useMockData);
+    void sleep();
+
+    /**
+     * @brief Hardware-level wakeup (Pulls SET pin HIGH).
+     */
+    void wakeup();
+
+    /**
+     * @brief Flushes the serial buffer to ensure fresh data.
+     */
+    void clearBuffer();
+
+    /**
+     * @brief Reads data from the sensor stream.
+     * @return true if a valid 32-byte packet was parsed.
+     */
+    bool readData(float& pm1_0, float& pm2_5, float& pm10_0);
 
 private:
     SoftwareSerial _pmSerial;
-    pms5003data* _data;
-
-    bool readPmsData();
-
-    bool readSensorPacket();
-    
-    // Generates random numbers for testing
-    void generateMockData(float& pm1_0, float& pm2_5, float& pm10_0);
+    int _setPin;
 };
 
 #endif
