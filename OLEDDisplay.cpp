@@ -18,35 +18,39 @@ void OLEDDisplay::setup() {
     display.display();
 }
 
-// THE NEW INTERFACE: Replaces displaySensorDataAndWifiStatus
 void OLEDDisplay::update(String wifiStatus, float pm1_0, float pm2_5, float pm10_0, 
-                         float temp, float hum, bool isWarmup, bool isSleeping) {
+                         float temp, float hum, bool isWarmup, bool isSleeping, int remainingSeconds) {
     display.clearDisplay();
     display.setTextColor(SSD1306_WHITE);
 
-    drawStatusBar(wifiStatus, isWarmup, isSleeping);
+    // Pass the remainingSeconds to the status bar
+    drawStatusBar(wifiStatus, isWarmup, isSleeping, remainingSeconds);
     drawHeroSection(pm2_5);
     drawSecondaryGrid(pm1_0, pm10_0, temp, hum);
 
     display.display();
 }
 
-// ----------------------------------------------------------------------
-// RENDER BLOCKS
-// ----------------------------------------------------------------------
-
-void OLEDDisplay::drawStatusBar(String wifiStatus, bool isWarmup, bool isSleeping) {
+void OLEDDisplay::drawStatusBar(String wifiStatus, bool isWarmup, bool isSleeping, int countdown) {
+    // 1. Physical State (Left)
     drawModeIcon(0, 0, isWarmup);
     drawFanIcon(15, 0, (isWarmup || !isSleeping));
-    drawWifiIcon(SCREEN_WIDTH - 9, 1, wifiStatus);
     
+    // 2. Logic State (Center) - Now showing the countdown
     display.setTextSize(1);
-    display.setCursor(35, 1);
+    display.setCursor(45, 1);
     
-    if (wifiStatus.indexOf("AP Config") >= 0) display.print("SETUP AP");
-    else if (isWarmup) display.print("WARMUP");
-    else if (isSleeping) display.print("IDLE");
-    else display.print("ACTIVE");
+    if (wifiStatus == "AP Config") {
+        display.print("SETUP");
+    } else {
+        // Show "Next action in XXs"
+        if (countdown < 100) display.print(" "); // Padding for alignment
+        display.print(countdown);
+        display.print("s");
+    }
+
+    // 3. Network State (Right)
+    drawWifiIcon(SCREEN_WIDTH - 12, 1, wifiStatus);
 
     display.drawFastHLine(0, 11, SCREEN_WIDTH, SSD1306_WHITE);
 }
