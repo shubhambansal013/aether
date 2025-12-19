@@ -18,22 +18,23 @@ void OLEDDisplay::setup() {
 }
 
 void OLEDDisplay::update(String wifiStatus, float pm1_0, float pm2_5, float pm10_0, 
-                         float temp, float hum, bool isWarmup, bool isSleeping, int remainingSeconds) {
+                         float temp, float hum, bool isWarmup, bool isSleeping, 
+                         int remainingSeconds, bool isBlynkUpdating) {
     display.clearDisplay();
     display.setTextColor(SSD1306_WHITE);
 
-    drawStatusBar(wifiStatus, isWarmup, isSleeping, remainingSeconds);
+    drawStatusBar(wifiStatus, isWarmup, isSleeping, remainingSeconds, isBlynkUpdating);
     drawHeroSection(pm2_5);
     drawSecondaryGrid(pm1_0, pm10_0, temp, hum);
 
     display.display();
 }
 
-void OLEDDisplay::drawStatusBar(String wifiStatus, bool isWarmup, bool isSleeping, int countdown) {
+void OLEDDisplay::drawStatusBar(String wifiStatus, bool isWarmup, bool isSleeping, int countdown, bool showBlynk) {
     drawModeIcon(0, 0, isWarmup);
     drawFanIcon(15, 0, (isWarmup || !isSleeping));
     
-    // Status Bar Center - Countdown
+    // Countdown
     display.setTextSize(1);
     display.setCursor(45, 1);
     if (wifiStatus == "AP Config") {
@@ -42,6 +43,12 @@ void OLEDDisplay::drawStatusBar(String wifiStatus, bool isWarmup, bool isSleepin
         if (countdown < 10) display.print(" "); 
         display.print(countdown);
         display.print("s");
+    }
+
+    // NEW: Blynk Indicator (Placed at X=105)
+    if (showBlynk) {
+        display.setCursor(SCREEN_WIDTH - 25, 1);
+        display.print("B");
     }
 
     drawWifiIcon(SCREEN_WIDTH - 12, 1, wifiStatus);
