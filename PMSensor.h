@@ -34,14 +34,31 @@ public:
     void clearBuffer();
 
     /**
-     * @brief Reads data from the sensor stream.
-     * @return true if a valid 32-byte packet was parsed.
+     * @brief Reads data from the sensor stream and verifies integrity.
+     * @return true if a valid 32-byte packet was parsed and checksum passed.
      */
     bool readData(float& pm1_0, float& pm2_5, float& pm10_0);
 
 private:
     SoftwareSerial _pmSerial;
     int _setPin;
+
+    // --- Private Helper Methods (Matches the refactored .cpp) ---
+    
+    /**
+     * @brief Searches the serial stream for the 0x42 0x4D start sequence.
+     */
+    bool findHeader();
+
+    /**
+     * @brief Calculates and verifies the checksum for the 32-byte packet.
+     */
+    bool isValidChecksum(byte* buffer, int length);
+
+    /**
+     * @brief Extracts specific PM values from the validated buffer.
+     */
+    void parseBuffer(byte* buffer, float& pm1_0, float& pm2_5, float& pm10_0);
 };
 
 #endif
