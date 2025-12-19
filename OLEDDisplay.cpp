@@ -17,41 +17,37 @@ void OLEDDisplay::setup() {
     display.display();
 }
 
-void OLEDDisplay::update(String wifiStatus, float pm1_0, float pm2_5, float pm10_0, 
-                         float temp, float hum, bool isWarmup, bool isSleeping, 
-                         int remainingSeconds, bool isBlynkUpdating) {
+void OLEDDisplay::update(const SystemData& data) {
     display.clearDisplay();
     display.setTextColor(SSD1306_WHITE);
 
-    drawStatusBar(wifiStatus, isWarmup, isSleeping, remainingSeconds, isBlynkUpdating);
-    drawHeroSection(pm2_5);
-    drawSecondaryGrid(pm1_0, pm10_0, temp, hum);
+    drawStatusBar(data);
+    drawHeroSection(data.pm2_5);
+    drawSecondaryGrid(data);
 
     display.display();
 }
 
-void OLEDDisplay::drawStatusBar(String wifiStatus, bool isWarmup, bool isSleeping, int countdown, bool showBlynk) {
-    drawModeIcon(0, 0, isWarmup);
-    drawFanIcon(15, 0, (isWarmup || !isSleeping));
+void OLEDDisplay::drawStatusBar(const SystemData& data) {
+    drawModeIcon(0, 0, data.isWarmup);
+    drawFanIcon(15, 0, (data.isWarmup || !data.isSleeping));
     
-    // Countdown
     display.setTextSize(1);
     display.setCursor(45, 1);
-    if (wifiStatus == "AP Config") {
+    if (data.wifiStatus == "AP Config") {
         display.print("SETUP");
     } else {
-        if (countdown < 10) display.print(" "); 
-        display.print(countdown);
+        if (data.countdown < 10) display.print(" "); 
+        display.print(data.countdown);
         display.print("s");
     }
 
-    // NEW: Blynk Indicator (Placed at X=105)
-    if (showBlynk) {
+    if (data.showBlynkIcon) {
         display.setCursor(SCREEN_WIDTH - 25, 1);
         display.print("B");
     }
 
-    drawWifiIcon(SCREEN_WIDTH - 12, 1, wifiStatus);
+    drawWifiIcon(SCREEN_WIDTH - 12, 1, data.wifiStatus);
     display.drawFastHLine(0, 11, SCREEN_WIDTH, SSD1306_WHITE);
 }
 
@@ -59,32 +55,29 @@ void OLEDDisplay::drawHeroSection(float pm2_5) {
     display.setTextSize(1);
     display.setCursor(0, 18);
     display.print("PM 2.5");
-
     display.setTextSize(3);
     String val = (pm2_5 < 0) ? "---" : String((int)pm2_5);
     int16_t x1, y1; uint16_t w, h;
     display.getTextBounds(val, 0, 0, &x1, &y1, &w, &h);
-    display.setCursor(SCREEN_WIDTH - w, 18); // Aligned with label
+    display.setCursor(SCREEN_WIDTH - w, 18);
     display.print(val);
 }
 
-void OLEDDisplay::drawSecondaryGrid(float pm1_0, float pm10_0, float temp, float hum) {
+void OLEDDisplay::drawSecondaryGrid(const SystemData& data) {
     display.drawFastHLine(0, 40, SCREEN_WIDTH, SSD1306_WHITE);
     display.setTextSize(1);
-    // Row 1
     display.setCursor(0, 44);
-    display.print("P1:"); display.print((int)pm1_0);
+    display.print("P1:"); display.print((int)data.pm1_0);
     display.setCursor(64, 44);
-    display.print("P10:"); display.print((int)pm10_0);
-    // Row 2
+    display.print("P10:"); display.print((int)data.pm10_0);
     display.setCursor(0, 56);
-    display.print("T:"); display.print(temp, 1); display.print("C");
+    display.print("T:"); display.print(data.temp, 1); display.print("C");
     display.setCursor(64, 56);
-    display.print("H:"); display.print((int)hum); display.print("%");
+    display.print("H:"); display.print((int)data.hum); display.print("%");
 }
 
 void OLEDDisplay::drawWifiIcon(int16_t x, int16_t y, String status) {
-    display.fillRect(x, y + 6, 2, 2, SSD1306_WHITE); // Base dot
+    display.fillRect(x, y + 6, 2, 2, SSD1306_WHITE);
     if (status.indexOf("Connected") >= 0) {
         display.fillRect(x + 3, y + 3, 2, 5, SSD1306_WHITE);
         display.fillRect(x + 6, y, 2, 8, SSD1306_WHITE);
@@ -117,7 +110,7 @@ void OLEDDisplay::drawFanIcon(int16_t x, int16_t y, bool isFanOn) {
     }
 }
 
-void OLEDDisplay::setBrightness(uint8_t contrast_value) { setOLEDContrast(contrast_value); display.display(); }
-void OLEDDisplay::setOLEDContrast(uint8_t value) { Wire.beginTransmission(SCREEN_ADDRESS); Wire.write(0x00); Wire.write(SSD1306_SETCONTRAST); Wire.write(value); Wire.endTransmission(); }
+void OLEDDisplay::setBrightness(uint8_t val) { setOLEDContrast(val); display.display(); }
+void OLEDDisplay::setOLEDContrast(uint8_t val) { Wire.beginTransmission(SCREEN_ADDRESS); Wire.write(0x00); Wire.write(SSD1306_SETCONTRAST); Wire.write(val); Wire.endTransmission(); }
 void OLEDDisplay::clear() { display.clearDisplay(); display.display(); }
 void OLEDDisplay::printMessage(String l1, String l2) { display.clearDisplay(); display.setTextSize(2); display.setCursor(0,0); display.println(l1); display.setTextSize(1); display.setCursor(0,25); display.println(l2); display.display(); }

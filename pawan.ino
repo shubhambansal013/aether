@@ -9,15 +9,16 @@
 #include "DHTSensor.h"
 #include "OLEDDisplay.h"
 #include "RGBLEDHandler.h"
+#include "SystemData.h"
 
-// --- Constants & Firmware Info ---
-const char* FIRMWARE_VERSION = "V1.3.1 - PWM LED Restore";
-const unsigned long INITIAL_WARMUP_DURATION = 300000; // 5 mins
-const unsigned long PM_WAKE_DURATION = 35000;         // 35s wake
-const unsigned long PM_SLEEP_DURATION = 120000;       // 2 mins sleep
-const unsigned long BLYNK_SEND_INTERVAL = 60000;      // 1 min throttle
-const unsigned long STABILITY_THRESHOLD = 30000;      // 30s stable wait
-const unsigned long BLYNK_ICON_KEEP_ALIVE = 3000;     // 3 seconds
+// --- Constants ---
+const char* FIRMWARE_VERSION = "V1.3.2 - DTO Pattern";
+const unsigned long INITIAL_WARMUP_DURATION = 300000; 
+const unsigned long PM_WAKE_DURATION = 35000;         
+const unsigned long PM_SLEEP_DURATION = 120000;       
+const unsigned long BLYNK_SEND_INTERVAL = 60000;      
+const unsigned long STABILITY_THRESHOLD = 30000;      
+const unsigned long BLYNK_ICON_KEEP_ALIVE = 3000;     
 
 // --- Global Instances ---
 WiFiHandler wifiHandler;
@@ -29,42 +30,29 @@ OLEDDisplay oledDisplay;
 RGBLEDHandler rgbLEDHandler(RGB_LED_RED_PIN, RGB_LED_GREEN_PIN, RGB_LED_BLUE_PIN);
 
 // --- Global State ---
-float pm1_0_val, pm2_5_val, pm10_0_val, temp_val, hum_val;
-unsigned long lastBlynkSend = 0;
-unsigned long stateTimer = 0;
-unsigned long bootTime = 0;
-unsigned long blynkIconTimer = 0;
-
-bool sensorIsAwake = true;
-bool isInitialWarmup = true;
-bool isDataFresh = false; 
+SystemData currentData; // The Single Source of Truth
+unsigned long lastBlynkSend = 0, stateTimer = 0, bootTime = 0, blynkIconTimer = 0;
+bool sensorIsAwake = true, isInitialWarmup = true, isDataFresh = false; 
 
 void setup() {
     Serial.begin(115200);
-    Serial.println("\n\n--- System Booting ---");
-    
     oledDisplay.setup();
     rgbLEDHandler.setup();
-    rgbLEDHandler.startupSequence(); 
-    
+    rgbLEDHandler.startupSequence();
     resetHandler.checkPowerCycles();
     wifiHandler.startConnect();
-    
     pmSensor.begin(9600);
     dhtSensor.setup();
-
     bootTime = millis();
     stateTimer = millis();
 }
 
 void loop() {
     wifiHandler.handleConnect();
-    
     handlePMSensor();
     updateSecondarySensors();
     updateDisplays();
     handleCloudUpdates();
-
     delay(1000); 
 }
 
@@ -73,33 +61,28 @@ void handlePMSensor() {
     unsigned long timeInState = currentMillis - stateTimer;
 
     if (isInitialWarmup) {
-        if (pmSensor.readData(pm1_0_val, pm2_5_val, pm10_0_val)) {
-            Serial.printf("[WARMUP] PM2.5: %.0f\n", pm2_5_val);
-            rgbLEDHandler.updateLED(pm2_5_val, true);
+        if (pmSensor.readData(currentData.pm1_0, currentData.pm2_5, currentData.pm10_0)) {
+            rgbLEDHandler.updateLED(currentData.pm2_5, true);
             if (currentMillis - bootTime > STABILITY_THRESHOLD) isDataFresh = true;
         }
         if (currentMillis - bootTime >= INITIAL_WARMUP_DURATION) {
             isInitialWarmup = false;
             stateTimer = currentMillis;
-            Serial.println(">> Warmup complete.");
         }
     } 
     else if (sensorIsAwake) {
-        if (pmSensor.readData(pm1_0_val, pm2_5_val, pm10_0_val)) {
-            Serial.printf("[ACTIVE] PM2.5: %.0f\n", pm2_5_val);
-            rgbLEDHandler.updateLED(pm2_5_val, true);
+        if (pmSensor.readData(currentData.pm1_0, currentData.pm2_5, currentData.pm10_0)) {
+            rgbLEDHandler.updateLED(currentData.pm2_5, true);
             if (timeInState > STABILITY_THRESHOLD) isDataFresh = true;
         }
         if (timeInState >= PM_WAKE_DURATION) {
             pmSensor.sleep();
             sensorIsAwake = false;
             stateTimer = currentMillis;
-            Serial.println(">> Sensor Sleeping.");
         }
     } 
     else {
         if (timeInState >= PM_SLEEP_DURATION) {
-            Serial.println(">> Sensor Waking.");
             pmSensor.wakeup();
             pmSensor.clearBuffer();
             sensorIsAwake = true;
@@ -110,35 +93,30 @@ void handlePMSensor() {
 }
 
 void updateSecondarySensors() {
-    hum_val = dhtSensor.readHumidity();
-    temp_val = dhtSensor.readTemperature();
+    currentData.hum = dhtSensor.readHumidity();
+    currentData.temp = dhtSensor.readTemperature();
 }
 
 void updateDisplays() {
     unsigned long currentMillis = millis();
     unsigned long timeInState = currentMillis - stateTimer;
-    int countdown = 0;
 
-    if (isInitialWarmup) {
-        countdown = (INITIAL_WARMUP_DURATION - (currentMillis - bootTime)) / 1000;
-    } else if (sensorIsAwake) {
-        countdown = (PM_WAKE_DURATION - timeInState) / 1000;
-    } else {
-        countdown = (PM_SLEEP_DURATION - timeInState) / 1000;
-    }
-    if (countdown < 0) countdown = 0;
+    // Populate the UI-specific fields of the struct
+    currentData.wifiStatus = wifiHandler.getWifiStatus();
+    currentData.isWarmup = isInitialWarmup;
+    currentData.isSleeping = !sensorIsAwake;
+    currentData.showBlynkIcon = (currentMillis - blynkIconTimer < BLYNK_ICON_KEEP_ALIVE);
 
-    bool showBlynk = (currentMillis - blynkIconTimer < BLYNK_ICON_KEEP_ALIVE);
+    if (isInitialWarmup) 
+        currentData.countdown = (INITIAL_WARMUP_DURATION - (currentMillis - bootTime)) / 1000;
+    else if (sensorIsAwake) 
+        currentData.countdown = (PM_WAKE_DURATION - timeInState) / 1000;
+    else 
+        currentData.countdown = (PM_SLEEP_DURATION - timeInState) / 1000;
 
-    oledDisplay.update(
-        wifiHandler.getWifiStatus(), 
-        pm1_0_val, pm2_5_val, pm10_0_val, 
-        temp_val, hum_val, 
-        isInitialWarmup, 
-        !sensorIsAwake,
-        countdown,
-        showBlynk
-    );
+    if (currentData.countdown < 0) currentData.countdown = 0;
+
+    oledDisplay.update(currentData);
 }
 
 void handleCloudUpdates() {
@@ -146,7 +124,7 @@ void handleCloudUpdates() {
     bool connected = (WiFi.status() == WL_CONNECTED && WiFi.getMode() == WIFI_STA);
 
     if (connected && (now - lastBlynkSend > BLYNK_SEND_INTERVAL) && isDataFresh) {
-        blynkHandler.sendData(BLYNK_AUTH_TOKEN, pm1_0_val, pm2_5_val, pm10_0_val, temp_val, hum_val);
+        blynkHandler.sendData(BLYNK_AUTH_TOKEN, currentData.pm1_0, currentData.pm2_5, currentData.pm10_0, currentData.temp, currentData.hum);
         lastBlynkSend = now;
         isDataFresh = false; 
         blynkIconTimer = now; 
