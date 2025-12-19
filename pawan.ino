@@ -71,9 +71,11 @@ void handlePMSensor() {
         }
     } 
     else if (sensorIsAwake) {
-        if (pmSensor.readData(currentData.pm1_0, currentData.pm2_5, currentData.pm10_0)) {
-            rgbLEDHandler.updateLED(currentData.pm2_5, true);
-            if (timeInState > STABILITY_THRESHOLD) isDataFresh = true;
+        if (timeInState > STABILITY_THRESHOLD) {
+            if (pmSensor.readData(currentData.pm1_0, currentData.pm2_5, currentData.pm10_0)) {
+                rgbLEDHandler.updateLED(currentData.pm2_5, true);
+                isDataFresh = true;
+            }
         }
         if (timeInState >= PM_WAKE_DURATION) {
             pmSensor.sleep();
