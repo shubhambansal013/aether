@@ -96,13 +96,25 @@ void updateSecondarySensors() {
 }
 
 void updateDisplays() {
-    // PASS DATA DIRECTLY - OLED HANDLES THE "HOW"
+    unsigned long currentMillis = millis();
+    unsigned long timeInState = currentMillis - stateTimer;
+    int countdown = 0;
+
+    if (isInitialWarmup) {
+        countdown = (INITIAL_WARMUP_DURATION - (currentMillis - bootTime)) / 1000;
+    } else if (sensorIsAwake) {
+        countdown = (PM_WAKE_DURATION - timeInState) / 1000;
+    } else {
+        countdown = (PM_SLEEP_DURATION - timeInState) / 1000;
+    }
+
     oledDisplay.update(
         wifiHandler.getWifiStatus(), 
         pm1_0_val, pm2_5_val, pm10_0_val, 
         temp_val, hum_val, 
         isInitialWarmup, 
-        !sensorIsAwake
+        !sensorIsAwake,
+        countdown // Pass the new countdown value
     );
 }
 
