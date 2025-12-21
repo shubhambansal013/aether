@@ -9,14 +9,19 @@ public:
     RGBLEDHandler(int pin);
     void setup();
     void startupSequence();
-    void updateLED(float pm2_5);
+    void updateLED(float pm2_5); 
 
 private:
     Adafruit_NeoPixel _strip;
     void setLEDColor(uint32_t hex);
     
-    static const uint32_t C_GREEN = 0x00FF00, C_YELLOW = 0xFFFF00, C_ORANGE = 0xFF8000;
-    static const uint32_t C_PINK = 0xFF1493, C_PURPLE = 0x800080, C_RED = 0xFF0000, C_BLUE = 0x0000FF;
+    static const uint32_t C_GREEN  = 0x00FF00;
+    static const uint32_t C_YELLOW = 0xFFFF00;
+    static const uint32_t C_ORANGE = 0xFF8000;
+    static const uint32_t C_PINK   = 0xFF1493;
+    static const uint32_t C_PURPLE = 0x800080;
+    static const uint32_t C_RED    = 0xFF0000;
+    static const uint32_t C_BLUE   = 0x0000FF;
 };
 
 #endif
