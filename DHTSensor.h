@@ -1,15 +1,17 @@
 #ifndef DHTSENSOR_H
 #define DHTSENSOR_H
 
-#include "pins.h"
+#include <Arduino.h>
 #include "DHT.h"
 
-// Define the DHT Sensor Pin and Type
-#define DHTTYPE DHT22   // DHT 22  (AM2302), AM2321
+// Note: DHTTYPE is still defined here as it's specific to the sensor hardware
+#define DHTTYPE DHT22   
 
 class DHTSensor {
 public:
-    DHTSensor();
+    // Constructor now takes the pin
+    DHTSensor(int pin);
+    
     void setup();
     float readHumidity();
     float readTemperature();

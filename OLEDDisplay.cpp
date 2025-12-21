@@ -1,15 +1,17 @@
 #include "OLEDDisplay.h"
-#include "pins.h"
 #include <Wire.h>
 
 #define SSD1306_SETCONTRAST 0x81
 #define SCREEN_ADDRESS 0x3C
 
-OLEDDisplay::OLEDDisplay() : display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET) {}
+OLEDDisplay::OLEDDisplay(int sdaPin, int sclPin) 
+    : display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET), _sda(sdaPin), _scl(sclPin) {}
 
 void OLEDDisplay::setup() {
-    Wire.begin(OLED_SDA_PIN, OLED_SCL_PIN); 
+    Wire.begin(_sda, _scl);
+
     if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) { 
+        Serial.println(F("SSD1306 allocation failed"));
         for (;;); 
     }
     setBrightness(DEFAULT_OLED_BRIGHTNESS); 

@@ -12,22 +12,23 @@
 
 class OLEDDisplay {
 public:
-    OLEDDisplay();
+    // Constructor now takes I2C pins
+    OLEDDisplay(int sdaPin, int sclPin); 
+    
     void setup();
     void setBrightness(uint8_t contrast_value);
     void clear();
     void printMessage(String line1, String line2);
-    
-    // Clean interface using the Data Object
     void update(const SystemData& data);
 
 private:
     Adafruit_SSD1306 display;
-    
+    int _sda, _scl; // Store pins for setup
+
     void drawStatusBar(const SystemData& data);
     void drawHeroSection(float pm2_5);
     void drawSecondaryGrid(const SystemData& data);
-    
+
     void drawWifiIcon(int16_t x, int16_t y, String status);
     void drawModeIcon(int16_t x, int16_t y, bool isWarmup);
     void drawFanIcon(int16_t x, int16_t y, bool isFanOn);
