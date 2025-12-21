@@ -60,12 +60,12 @@ void loop() {
     updateUI();
     handleBlynkTransmission();
 
-    // LED Logic
     if (ledMuted) {
-        led.updateLED(0, false); // Off
+        led.updateLED(-1.0); // Forces Blue/Off state
     } else {
-        // Show Blue if warming up/stabilizing, otherwise AQI color
-        led.updateLED(data.pm2_5, isDataFresh || data.isWarmup);
+        // This will now show the AQI color as soon as the first 
+        // reading arrives and keep it during the sleep phase.
+        led.updateLED(data.pm2_5); 
     }
 
     delay(100); 
@@ -85,6 +85,16 @@ void handleButton() {
 
 void handlePMSensor() {
     unsigned long now = millis();
+    if (data.isWarmup || sensorAwake) {
+        if (pmSensor.readData(data.pm1_0, data.pm2_5, data.pm10_0)) {
+            // LED switches from Blue to color here because data.pm2_5 is now > 0
+            if (data.isWarmup) {
+                if (now - bootTime > STABILITY_THRESHOLD) isDataFresh = true;
+            } else {
+                if ((now - stateTimer) > STABILITY_THRESHOLD) isDataFresh = true;
+            }
+        }
+    }
     unsigned long elapsed = now - stateTimer;
 
     if (data.isWarmup) {
