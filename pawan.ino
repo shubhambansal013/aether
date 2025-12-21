@@ -9,42 +9,26 @@
 #include "BlynkHandler.h"
 #include "blynk_config.h"
 
-// --- Shield for ESP8266 IRAM Errors ---
-#ifndef IRAM_ATTR
-  #define IRAM_ATTR __attribute__((section(".text")))
-#endif
-
-// --- Instances ---
 SystemData data;
 PMSensor pmSensor(PM_SENSOR_RX_PIN, PM_SENSOR_SET_PIN);
 DHTSensor dhtSensor(DHT_PIN);
 OLEDDisplay oled(OLED_SDA_PIN, OLED_SCL_PIN);
-RGBLEDHandler led(WS2812_PIN); 
+RGBLEDHandler led(WS2812_PIN); // Pin 15 (D8)
 WiFiHandler wifi;
 BlynkHandler blynk;
 
-// --- Timers & State ---
-unsigned long lastBlynk = 0;
-unsigned long stateTimer = 0;
-unsigned long bootTime = 0;
-unsigned long blynkFlashTimer = 0; // Timer for the 'B' icon
-
-bool sensorAwake = true;
-bool isDataFresh = false;
-bool ledMuted = false;
+unsigned long lastBlynk = 0, stateTimer = 0, bootTime = 0, blynkFlashTimer = 0;
+bool sensorAwake = true, isDataFresh = false;
 
 void setup() {
     Serial.begin(115200);
     pinMode(BUTTON_PIN, INPUT_PULLUP);
-    
     oled.setup();
     led.setup();
     led.startupSequence();
-    
     pmSensor.begin(9600);
     dhtSensor.setup();
     wifi.startConnect();
-    
     bootTime = millis();
     stateTimer = millis();
 }
@@ -60,68 +44,39 @@ void loop() {
     updateUI();
     handleBlynkTransmission();
 
-    if (ledMuted) {
-        led.updateLED(-1.0); // Forces Blue/Off state
-    } else {
-        // This will now show the AQI color as soon as the first 
-        // reading arrives and keep it during the sleep phase.
-        led.updateLED(data.pm2_5); 
-    }
+    // LED always follows data.pm2_5 now
+    led.updateLED(data.pm2_5); 
 
     delay(100); 
 }
 
 void handleButton() {
-    static bool lastBtnState = HIGH;
-    bool currentBtnState = digitalRead(BUTTON_PIN);
-    
-    if (lastBtnState == HIGH && currentBtnState == LOW) {
-        ledMuted = !ledMuted;
-        Serial.println(F(">> UI: LED Mute Toggled"));
-        delay(200); 
-    }
-    lastBtnState = currentBtnState;
+    // Logic removed. Button is currently free for other uses.
 }
 
 void handlePMSensor() {
     unsigned long now = millis();
+    unsigned long elapsed = now - stateTimer;
+
     if (data.isWarmup || sensorAwake) {
         if (pmSensor.readData(data.pm1_0, data.pm2_5, data.pm10_0)) {
-            // LED switches from Blue to color here because data.pm2_5 is now > 0
+            // Log to Serial to confirm the sensor is talking
+            if (millis() % 2000 < 100) Serial.printf("Sensor Data: %.0f\n", data.pm2_5);
+
             if (data.isWarmup) {
                 if (now - bootTime > STABILITY_THRESHOLD) isDataFresh = true;
             } else {
-                if ((now - stateTimer) > STABILITY_THRESHOLD) isDataFresh = true;
+                if (elapsed > STABILITY_THRESHOLD) isDataFresh = true;
             }
         }
-    }
-    unsigned long elapsed = now - stateTimer;
-
-    if (data.isWarmup) {
-        if (pmSensor.readData(data.pm1_0, data.pm2_5, data.pm10_0)) {
-            // During warmup, we allow the LED to show data but wait for stability
-            if (now - bootTime > 30000) isDataFresh = true;
+        
+        if (data.isWarmup && (now - bootTime >= INITIAL_WARMUP_DURATION)) {
+            data.isWarmup = false; stateTimer = now;
+        } else if (!data.isWarmup && (elapsed >= PM_WAKE_DURATION)) {
+            pmSensor.sleep(); sensorAwake = false; stateTimer = now; isDataFresh = false;
         }
-        if (now - bootTime >= INITIAL_WARMUP_DURATION) {
-            data.isWarmup = false; 
-            stateTimer = now;
-        }
-    } else if (sensorAwake) {
-        if (pmSensor.readData(data.pm1_0, data.pm2_5, data.pm10_0)) {
-            if (elapsed > STABILITY_THRESHOLD) isDataFresh = true;
-        }
-        if (elapsed >= PM_WAKE_DURATION) {
-            pmSensor.sleep(); 
-            sensorAwake = false; 
-            stateTimer = now; 
-            isDataFresh = false; 
-        }
-    } else {
-        if (elapsed >= PM_SLEEP_DURATION) {
-            pmSensor.wakeup(); 
-            sensorAwake = true; 
-            stateTimer = now;
-        }
+    } else if (now - stateTimer >= PM_SLEEP_DURATION) {
+        pmSensor.wakeup(); sensorAwake = true; stateTimer = now;
     }
 }
 
@@ -129,32 +84,21 @@ void updateUI() {
     unsigned long now = millis();
     data.wifiStatus = wifi.getWifiStatus();
     data.isSleeping = !sensorAwake;
-
-    // FIX: Only show 'B' if we just uploaded data in the last 3 seconds
     data.showBlynkIcon = (now - blynkFlashTimer < BLYNK_ICON_KEEP_ALIVE);
 
     unsigned long elapsed = now - stateTimer;
-    if (data.isWarmup) {
-        data.countdown = (INITIAL_WARMUP_DURATION - (now - bootTime)) / 1000;
-    } else {
-        unsigned long limit = sensorAwake ? PM_WAKE_DURATION : PM_SLEEP_DURATION;
-        data.countdown = (limit - elapsed) / 1000;
-    }
+    if (data.isWarmup) data.countdown = (INITIAL_WARMUP_DURATION - (now - bootTime)) / 1000;
+    else data.countdown = ((sensorAwake ? PM_WAKE_DURATION : PM_SLEEP_DURATION) - elapsed) / 1000;
     if (data.countdown < 0) data.countdown = 0;
-    
     oled.update(data);
 }
 
 void handleBlynkTransmission() {
     unsigned long now = millis();
-    bool connected = (WiFi.status() == WL_CONNECTED);
-
-    if (connected && isDataFresh && (now - lastBlynk > BLYNK_SEND_INTERVAL)) {
-        Serial.println(F(">> BLYNK: Uploading stable data."));
+    if ((WiFi.status() == WL_CONNECTED) && isDataFresh && (now - lastBlynk > BLYNK_SEND_INTERVAL)) {
         blynk.sendData(BLYNK_AUTH_TOKEN, data.pm1_0, data.pm2_5, data.pm10_0, data.temp, data.hum);
-        
         lastBlynk = now;
-        blynkFlashTimer = now; // Triggers the 'B' on OLED for 3 seconds
+        blynkFlashTimer = now;
         isDataFresh = false; 
     }
 }
