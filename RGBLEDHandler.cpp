@@ -25,8 +25,12 @@ void RGBLEDHandler::startupSequence() {
     setLEDColor(0);
 }
 
-void RGBLEDHandler::updateLED(float pm2_5, bool isDataFresh) {
-    if (!isDataFresh) { setLEDColor(C_BLUE); return; }
+void RGBLEDHandler::updateLED(float pm2_5) {
+    // ONLY show Blue if we have never received a single packet (pm2_5 is -1)
+    if (pm2_5 < 0) { 
+        setLEDColor(C_BLUE); 
+        return; 
+    }
     
     uint32_t color;
     if (pm2_5 <= 30)       color = C_GREEN;
