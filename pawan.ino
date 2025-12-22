@@ -38,8 +38,8 @@ void loop() {
     handleButton();
     handlePMSensor();
     
-    data.temp = dhtSensor.readTemperature();
-    data.hum = dhtSensor.readHumidity();
+    data.temp = dhtSensor.getTemperature();
+    data.hum  = dhtSensor.getHumidity();
     
     updateUI();
     handleBlynkTransmission();
