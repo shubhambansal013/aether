@@ -1,7 +1,7 @@
 #include "DHTSensor.h"
-#include <Arduino.h>
 
-DHTSensor::DHTSensor() : dht(DHT_PIN, DHTTYPE) {}
+// The pin is now passed from the constructor in pawan.ino
+DHTSensor::DHTSensor(int pin) : dht(pin, DHTTYPE) {}
 
 void DHTSensor::setup() {
     dht.begin();

@@ -1,159 +1,104 @@
-#include <ESP8266WiFi.h>
-#include <WiFiManager.h>
+#include <Arduino.h>
+#include "Config.h"
+#include "SystemData.h"
 #include "WiFiHandler.h"
-#include "ResetHandler.h"
 #include "PMSensor.h"
-#include "BlynkHandler.h"
-#include "blynk_config.h"
-#include "pins.h"
 #include "DHTSensor.h"
 #include "OLEDDisplay.h"
 #include "RGBLEDHandler.h"
+#include "BlynkHandler.h"
+#include "blynk_config.h"
 
-// --- Constants & Firmware Info ---
-const char* FIRMWARE_VERSION = "V1.2.8 - Stability Lock";
-const unsigned long INITIAL_WARMUP_DURATION = 300000; // 5 mins
-const unsigned long PM_WAKE_DURATION = 35000;         // 35s wake
-const unsigned long PM_SLEEP_DURATION = 120000;       // 2 mins sleep
-const unsigned long BLYNK_SEND_INTERVAL = 60000;      // 1 min throttle
-const unsigned long STABILITY_THRESHOLD = 30000;      // 30s stable wait
+SystemData data;
+PMSensor pmSensor(PM_SENSOR_RX_PIN, PM_SENSOR_SET_PIN);
+DHTSensor dhtSensor(DHT_PIN);
+OLEDDisplay oled(OLED_SDA_PIN, OLED_SCL_PIN);
+RGBLEDHandler led(WS2812_PIN); // Pin 15 (D8)
+WiFiHandler wifi;
+BlynkHandler blynk;
 
-// --- Global Instances ---
-WiFiHandler wifiHandler;
-ResetHandler resetHandler(wifiHandler);
-PMSensor pmSensor(PM_SENSOR_RX_PIN, PM_SENSOR_SET_PIN); 
-BlynkHandler blynkHandler;
-DHTSensor dhtSensor;
-OLEDDisplay oledDisplay;
-RGBLEDHandler rgbLEDHandler(RGB_LED_RED_PIN, RGB_LED_GREEN_PIN, RGB_LED_BLUE_PIN);
-
-// --- Global State ---
-float pm1_0_val, pm2_5_val, pm10_0_val, temp_val, hum_val;
-unsigned long lastBlynkSend = 0;
-unsigned long stateTimer = 0;
-unsigned long bootTime = 0;
-
-bool sensorIsAwake = true;
-bool isInitialWarmup = true;
-bool isDataFresh = false; 
+unsigned long lastBlynk = 0, stateTimer = 0, bootTime = 0, blynkFlashTimer = 0;
+bool sensorAwake = true, isDataFresh = false;
 
 void setup() {
     Serial.begin(115200);
-    Serial.println("\n\n--- System Booting ---");
-    Serial.printf("Firmware: %s\n", FIRMWARE_VERSION);
-    
-    oledDisplay.setup();
-    rgbLEDHandler.setup();
-    rgbLEDHandler.startupSequence();
-    
-    resetHandler.checkPowerCycles();
-    wifiHandler.startConnect();
-    
+    pinMode(BUTTON_PIN, INPUT_PULLUP);
+    oled.setup();
+    led.setup();
+    led.startupSequence();
     pmSensor.begin(9600);
     dhtSensor.setup();
-
+    wifi.startConnect();
     bootTime = millis();
     stateTimer = millis();
-    Serial.println(">> MODE: Initial 5-minute warmup started.");
 }
 
 void loop() {
-    wifiHandler.handleConnect();
-    
+    wifi.handleConnect();
+    handleButton();
     handlePMSensor();
-    updateSecondarySensors();
-    updateDisplays();
-    handleCloudUpdates();
+    
+    data.temp = dhtSensor.readTemperature();
+    data.hum = dhtSensor.readHumidity();
+    
+    updateUI();
+    handleBlynkTransmission();
 
-    delay(1000); 
+    // LED always follows data.pm2_5 now
+    led.updateLED(data.pm2_5); 
+
+    delay(100); 
 }
 
-// ----------------------------------------------------------------------
-// 🛠️ REFACTORED METHODS
-// ----------------------------------------------------------------------
+void handleButton() {
+    // Logic removed. Button is currently free for other uses.
+}
 
 void handlePMSensor() {
-    unsigned long currentMillis = millis();
-    unsigned long timeInState = currentMillis - stateTimer;
+    unsigned long now = millis();
+    unsigned long elapsed = now - stateTimer;
 
-    if (isInitialWarmup) {
-        if (pmSensor.readData(pm1_0_val, pm2_5_val, pm10_0_val)) {
-            Serial.printf("[WARMUP] PM2.5: %.0f\n", pm2_5_val);
-            rgbLEDHandler.updateLED(pm2_5_val, true);
-            
-            // Only allow data to be sent after first 15s of boot
-            if (currentMillis - bootTime > STABILITY_THRESHOLD) {
-                isDataFresh = true;
+    if (data.isWarmup || sensorAwake) {
+        if (pmSensor.readData(data.pm1_0, data.pm2_5, data.pm10_0)) {
+            // Log to Serial to confirm the sensor is talking
+            if (millis() % 2000 < 100) Serial.printf("Sensor Data: %.0f\n", data.pm2_5);
+
+            if (data.isWarmup) {
+                if (now - bootTime > STABILITY_THRESHOLD) isDataFresh = true;
+            } else {
+                if (elapsed > STABILITY_THRESHOLD) isDataFresh = true;
             }
         }
-
-        if (currentMillis - bootTime >= INITIAL_WARMUP_DURATION) {
-            isInitialWarmup = false;
-            stateTimer = currentMillis;
-            Serial.println(">> MODE: Warmup complete. Entering Duty Cycle.");
-        }
-    } 
-    else if (sensorIsAwake) {
-        if (pmSensor.readData(pm1_0_val, pm2_5_val, pm10_0_val)) {
-            Serial.printf("[ACTIVE] PM2.5: %.0f\n", pm2_5_val);
-            rgbLEDHandler.updateLED(pm2_5_val, true);
-
-            // STABILITY LOCK: Only mark as fresh if fan has run for > 15s
-            if (timeInState > STABILITY_THRESHOLD) {
-                isDataFresh = true; 
-            }
-        }
-
-        if (timeInState >= PM_WAKE_DURATION) {
-            pmSensor.sleep();
-            sensorIsAwake = false;
-            stateTimer = currentMillis;
-            Serial.println(">> SENSOR: Entering sleep (Duty Cycle).");
-        }
-    } 
-    else {
-        // While sleeping, we don't set isDataFresh to false.
-        // This allows the stable reading captured at the end of the wake 
-        // window to be uploaded if the Blynk timer expires during sleep.
         
-        if (timeInState >= PM_SLEEP_DURATION) {
-            Serial.println(">> SENSOR: Waking up for new cycle.");
-            pmSensor.wakeup();
-            pmSensor.clearBuffer();
-            sensorIsAwake = true;
-            stateTimer = currentMillis;
-            
-            // Reset freshness ONLY at wakeup so we don't send 
-            // the first few unstable packets of the new cycle.
-            isDataFresh = false; 
+        if (data.isWarmup && (now - bootTime >= INITIAL_WARMUP_DURATION)) {
+            data.isWarmup = false; stateTimer = now;
+        } else if (!data.isWarmup && (elapsed >= PM_WAKE_DURATION)) {
+            pmSensor.sleep(); sensorAwake = false; stateTimer = now; isDataFresh = false;
         }
+    } else if (now - stateTimer >= PM_SLEEP_DURATION) {
+        pmSensor.wakeup(); sensorAwake = true; stateTimer = now;
     }
 }
 
-void updateSecondarySensors() {
-    hum_val = dhtSensor.readHumidity();
-    temp_val = dhtSensor.readTemperature();
-}
-
-void updateDisplays() {
-    String status = wifiHandler.getWifiStatus();
-    if (isInitialWarmup) status += " (Warmup)";
-    else if (!sensorIsAwake) status += " (Zzz)"; 
-    
-    oledDisplay.displaySensorDataAndWifiStatus(status, pm1_0_val, pm2_5_val, pm10_0_val, hum_val, temp_val);
-}
-
-void handleCloudUpdates() {
+void updateUI() {
     unsigned long now = millis();
-    bool connected = (WiFi.status() == WL_CONNECTED && WiFi.getMode() == WIFI_STA);
+    data.wifiStatus = wifi.getWifiStatus();
+    data.isSleeping = !sensorAwake;
+    data.showBlynkIcon = (now - blynkFlashTimer < BLYNK_ICON_KEEP_ALIVE);
 
-    // Criteria: 1. Timer expired, 2. WiFi connected, 3. Data is stabilized
-    if (connected && (now - lastBlynkSend > BLYNK_SEND_INTERVAL) && isDataFresh) {
-        Serial.println(">> BLYNK: Sending stable measurement.");
-        blynkHandler.sendData(BLYNK_AUTH_TOKEN, pm1_0_val, pm2_5_val, pm10_0_val, temp_val, hum_val);
-        lastBlynkSend = now;
-        
-        // Reset so we don't double-send the same packet in one window
+    unsigned long elapsed = now - stateTimer;
+    if (data.isWarmup) data.countdown = (INITIAL_WARMUP_DURATION - (now - bootTime)) / 1000;
+    else data.countdown = ((sensorAwake ? PM_WAKE_DURATION : PM_SLEEP_DURATION) - elapsed) / 1000;
+    if (data.countdown < 0) data.countdown = 0;
+    oled.update(data);
+}
+
+void handleBlynkTransmission() {
+    unsigned long now = millis();
+    if ((WiFi.status() == WL_CONNECTED) && isDataFresh && (now - lastBlynk > BLYNK_SEND_INTERVAL)) {
+        blynk.sendData(BLYNK_AUTH_TOKEN, data.pm1_0, data.pm2_5, data.pm10_0, data.temp, data.hum);
+        lastBlynk = now;
+        blynkFlashTimer = now;
         isDataFresh = false; 
     }
 }
