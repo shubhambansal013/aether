@@ -1,27 +1,17 @@
 #include "DHTSensor.h"
 
-// The pin is now passed from the constructor in pawan.ino
-DHTSensor::DHTSensor(int pin) : dht(pin, DHTTYPE) {}
+DHTSensor::DHTSensor(int pin) : _dht(pin, DHT22) {}
 
 void DHTSensor::setup() {
-    dht.begin();
-    Serial.println("DHT22 Sensor initialized.");
+    _dht.begin();
 }
 
-float DHTSensor::readHumidity() {
-    float h = dht.readHumidity();
-    if (isnan(h)) {
-        Serial.println("Failed to read humidity from DHT sensor!");
-        return NAN;
-    }
-    return h;
+float DHTSensor::getTemperature() {
+    float t = _dht.readTemperature();
+    return isnan(t) ? INVALID_VALUE : t;
 }
 
-float DHTSensor::readTemperature() {
-    float t = dht.readTemperature();
-    if (isnan(t)) {
-        Serial.println("Failed to read temperature from DHT sensor!");
-        return NAN;
-    }
-    return t;
+float DHTSensor::getHumidity() {
+    float h = _dht.readHumidity();
+    return isnan(h) ? INVALID_VALUE : h;
 }
