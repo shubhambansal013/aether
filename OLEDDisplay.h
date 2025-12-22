@@ -34,7 +34,7 @@ private:
 
     // --- UI Components ---
     void drawWifiIcon(int16_t x, int16_t y, String status);
-    void drawModeIcon(int16_t x, int16_t y, bool isWarmup);
+    void drawModeIcon(int16_t x, int16_t y, const SystemData& data);
     void drawFanIcon(int16_t x, int16_t y, bool isFanOn);
     void setOLEDContrast(uint8_t val);
 };
