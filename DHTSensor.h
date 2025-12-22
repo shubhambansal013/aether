@@ -1,23 +1,20 @@
-#ifndef DHTSENSOR_H
-#define DHTSENSOR_H
+#ifndef DHT_SENSOR_H
+#define DHT_SENSOR_H
 
-#include <Arduino.h>
 #include "DHT.h"
-
-// Note: DHTTYPE is still defined here as it's specific to the sensor hardware
-#define DHTTYPE DHT22   
 
 class DHTSensor {
 public:
-    // Constructor now takes the pin
     DHTSensor(int pin);
-    
     void setup();
-    float readHumidity();
-    float readTemperature();
+    float getTemperature(); // Returns -999 on error
+    float getHumidity();    // Returns -999 on error
+    
+    // Static constant for error checking elsewhere
+    static constexpr float INVALID_VALUE = -999.0;
 
 private:
-    DHT dht;
+    DHT _dht;
 };
 
 #endif
