@@ -6,8 +6,8 @@
 struct SystemData {
     // Sensor Values
     float pm1_0 = -1.0, pm2_5 = -1.0, pm10_0 = -1.0;
-    float temp = 0;
-    float hum = 0;
+    
+    float temp = -999, hum = -999;
 
     // System States
     String wifiStatus = "Unknown";
