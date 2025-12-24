@@ -97,73 +97,62 @@ void loop() {
 }
 
 /**
- * @brief Logic for cycling through 3 user modes.
- * Transitions: AUTO -> ACTIVE (A) -> PASSIVE (P) -> AUTO
+ * @brief Transitions: AUTO -> PASSIVE -> ACTIVE -> AUTO
  */
 void cycleSystemMode() {
-    // Manual interaction always cancels the 5-min warmup
-    data.isWarmup = false;
-
     if (data.currentMode == MODE_AUTO) {
+        data.currentMode = MODE_PASSIVE;
+        data.isWarmup = false;
+        sensorAwake = false; // Start passive mode with a sleep
+        pmSensor.sleep();
+        Serial.println(F(">> MODE: PASSIVE (Cycle Only)"));
+    } 
+    else if (data.currentMode == MODE_PASSIVE) {
         data.currentMode = MODE_ACTIVE;
+        data.isWarmup = false;
         sensorAwake = true;
         pmSensor.wakeup();
-        Serial.println(F(">> MODE SWITCH: MANUAL ACTIVE (A)"));
-    } 
-    else if (data.currentMode == MODE_ACTIVE) {
-        data.currentMode = MODE_PASSIVE;
-        // Passive starts with a fresh cycle
-        sensorAwake = true; 
-        pmSensor.wakeup();
-        Serial.println(F(">> MODE SWITCH: MANUAL PASSIVE (P)"));
+        Serial.println(F(">> MODE: ACTIVE (Always On)"));
     } 
     else {
         data.currentMode = MODE_AUTO;
+        data.isWarmup = true; // Auto starts with warmup
+        bootTime = millis();
         sensorAwake = true;
         pmSensor.wakeup();
-        Serial.println(F(">> MODE SWITCH: AUTO (Back to Duty Cycle)"));
+        Serial.println(F(">> MODE: AUTO (Warmup then Cycle)"));
     }
-    
     stateTimer = millis();
     isDataFresh = false;
 }
 
-/**
- * @brief PM Sensor State Machine.
- * Manages WARMUP, ACTIVE (Always On), and PASSIVE (Cycle) behaviors.
- */
 void handlePMSensor() {
     unsigned long now = millis();
     unsigned long elapsed = now - stateTimer;
 
-    // 1. ACTIVE MODE: Fan is always on, no timers.
+    // 1. MODE: ACTIVE - No timers, just stay awake
     if (data.currentMode == MODE_ACTIVE) {
-        if (pmSensor.readData(data.pm1_0, data.pm2_5, data.pm10_0)) {
-            isDataFresh = true; 
-        }
-        return; 
+        if (pmSensor.readData(data.pm1_0, data.pm2_5, data.pm10_0)) isDataFresh = true;
+        return;
     }
 
-    // 2. AUTO MODE WARMUP: Runs for INITIAL_WARMUP_DURATION
-    if (data.isWarmup && data.currentMode == MODE_AUTO) {
+    // 2. MODE: AUTO (Initial Warmup Phase)
+    if (data.currentMode == MODE_AUTO && data.isWarmup) {
         if (pmSensor.readData(data.pm1_0, data.pm2_5, data.pm10_0)) {
             if (now - bootTime > STABILITY_THRESHOLD) isDataFresh = true;
         }
         if (now - bootTime >= INITIAL_WARMUP_DURATION) {
-            data.isWarmup = false; 
+            data.isWarmup = false; // Move to cycle phase
             stateTimer = now;
-            Serial.println(F(">> SENSOR: Warmup Complete. Entering Cycle."));
         }
         return;
     }
 
-    // 3. CYCLE LOGIC (Used by PASSIVE and post-warmup AUTO)
+    // 3. CYCLE LOGIC (Used by PASSIVE and Post-Warmup AUTO)
     if (sensorAwake) {
         if (pmSensor.readData(data.pm1_0, data.pm2_5, data.pm10_0)) {
             if (elapsed > STABILITY_THRESHOLD) isDataFresh = true;
         }
-        
-        // Both modes use the same PM_WAKE_DURATION (32s) for cycling
         if (elapsed >= PM_WAKE_DURATION) {
             pmSensor.sleep();
             sensorAwake = false;
@@ -171,7 +160,6 @@ void handlePMSensor() {
             isDataFresh = false;
         }
     } else {
-        // Handle Sleep Duration
         if (elapsed >= PM_SLEEP_DURATION) {
             pmSensor.wakeup();
             sensorAwake = true;
