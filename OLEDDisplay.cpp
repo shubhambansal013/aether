@@ -29,18 +29,19 @@ void OLEDDisplay::update(const SystemData& data) {
     display.display();
 }
 
-// --- Private Specialized Drawing Methods ---
-
 void OLEDDisplay::drawStatusBar(const SystemData& data) {
-    drawModeIcon(0, 0, data.isWarmup);
+    // Pass the actual mode to the icon drawer
+    drawModeIcon(0, 0, data);
     drawFanIcon(15, 0, (data.isWarmup || !data.isSleeping));
     
-    // Center Info (Countdown or Setup)
     display.setTextSize(1);
     display.setCursor(45, 1);
+
     if (data.wifiStatus == "AP Config") {
         display.print("SETUP");
-    } else {
+    } 
+    // Only show countdown if NOT in Manual Active mode
+    else if (data.currentMode != MODE_ACTIVE) {
         if (data.countdown < 10) display.print(" "); 
         display.print(data.countdown);
         display.print("s");
@@ -70,18 +71,12 @@ void OLEDDisplay::drawSecondaryGrid(const SystemData& data) {
     display.drawFastHLine(0, 40, SCREEN_WIDTH, SSD1306_WHITE);
     display.setTextSize(1);
     
-    // Row 1: PM 1.0 and PM 10.0
     renderMetric(0, 44, "P1:", data.pm1_0, 0);
     renderMetric(64, 44, "P10:", data.pm10_0, 0);
-    
-    // Row 2: Temp and Humidity
     renderMetric(0, 56, "T:", data.temp, 1, "C");
     renderMetric(64, 56, "H:", data.hum, 0, "%");
 }
 
-/**
- * @brief Generic helper to render a metric with error handling to remove redundant code
- */
 void OLEDDisplay::renderMetric(int x, int y, String label, float val, int precision, String unit) {
     display.setCursor(x, y);
     display.print(label);
@@ -98,10 +93,8 @@ void OLEDDisplay::drawBlynkIndicator() {
     display.print("B");
 }
 
-// --- UI Components ---
-
 void OLEDDisplay::drawWifiIcon(int16_t x, int16_t y, String status) {
-    display.fillRect(x, y + 6, 2, 2, SSD1306_WHITE); // Base dot
+    display.fillRect(x, y + 6, 2, 2, SSD1306_WHITE);
     if (status.indexOf("Connected") >= 0) {
         display.fillRect(x + 3, y + 3, 2, 5, SSD1306_WHITE);
         display.fillRect(x + 6, y, 2, 8, SSD1306_WHITE);
@@ -110,16 +103,25 @@ void OLEDDisplay::drawWifiIcon(int16_t x, int16_t y, String status) {
         if (stage >= 1) display.fillRect(x + 3, y + 3, 2, 5, SSD1306_WHITE);
         if (stage >= 2) display.fillRect(x + 6, y, 2, 8, SSD1306_WHITE);
     } else {
-        // "X" for disconnected
         display.drawLine(x + 4, y + 1, x + 10, y + 7, SSD1306_WHITE);
         display.drawLine(x + 10, y + 1, x + 4, y + 7, SSD1306_WHITE);
     }
 }
 
-void OLEDDisplay::drawModeIcon(int16_t x, int16_t y, bool isWarmup) {
+/**
+ * @brief Updated to show A (Auto), M (Manual Active), or P (Passive)
+ */
+void OLEDDisplay::drawModeIcon(int16_t x, int16_t y, const SystemData& data) {
     display.drawRect(x, y, 11, 9, SSD1306_WHITE);
     display.setCursor(x + 3, y + 1);
-    display.print(isWarmup ? "A" : "P");
+    
+    // We only show the mode letter. 
+    // Warmup is part of AUTO, so it still shows 'A'.
+    switch (data.currentMode) {
+        case MODE_AUTO:    display.print("A"); break;
+        case MODE_PASSIVE: display.print("P"); break;
+        case MODE_ACTIVE:  display.print("M"); break; // M for Manual/Max Active
+    }
 }
 
 void OLEDDisplay::drawFanIcon(int16_t x, int16_t y, bool isFanOn) {
@@ -134,8 +136,6 @@ void OLEDDisplay::drawFanIcon(int16_t x, int16_t y, bool isFanOn) {
         display.drawLine(x+4+y_off, y+4-x_off, x+4-y_off, y+4+x_off, SSD1306_WHITE);
     }
 }
-
-// --- Utility Methods ---
 
 void OLEDDisplay::setBrightness(uint8_t val) { 
     Wire.beginTransmission(SCREEN_ADDRESS); 
