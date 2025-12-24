@@ -14,9 +14,9 @@ const int BUTTON_PIN        = 13; // D7 (GPIO 13)
 
 // --- Timing ---
 const unsigned long INITIAL_WARMUP_DURATION = 300000; // 5 mins
-const unsigned long PM_WAKE_DURATION        = 60000;  // 60s
+const unsigned long PM_WAKE_DURATION        = 32000;  // 32s
 const unsigned long PM_SLEEP_DURATION       = 60000; // 60s
-const unsigned long STABILITY_THRESHOLD     = 20000;  // 20s stable wait
+const unsigned long STABILITY_THRESHOLD     = 30000;  // 30s stable wait
 const unsigned long BLYNK_SEND_INTERVAL     = 60000;  
 const unsigned long BLYNK_ICON_KEEP_ALIVE   = 3000;
 
