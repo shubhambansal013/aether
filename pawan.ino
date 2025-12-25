@@ -43,7 +43,7 @@ void cycleSystemMode();
 void setup() {
     Serial.begin(115200);
     
-    // 1. Initialize Hardware Classes
+    // 1. Initialize Hardware
     button.setup();
     oled.setup();
     led.setup();
@@ -53,12 +53,12 @@ void setup() {
     dhtSensor.setup();
     wifi.startConnect();
 
-    // 2. Set Initial Mode from Config
+    // 2. Initial Mode (Simplified to 2 Phases)
+    // We assume Config.h now only uses MODE_ACTIVE or MODE_PASSIVE
     data.currentMode = (SystemMode)DEFAULT_MODE_SETTING;
-    data.isWarmup = (data.currentMode == MODE_AUTO);
+    data.isWarmup = false; 
     
-    // 3. Set Initial Sensor State
-    // Active and Auto start with fan ON. Passive starts ON for its first cycle.
+    // Both modes start with sensor awake
     sensorAwake = true;
     pmSensor.wakeup();
     
@@ -66,62 +66,49 @@ void setup() {
     stateTimer = millis();
     
     Serial.print(F("--- System Initialized. Mode: "));
-    Serial.println(data.currentMode == MODE_AUTO ? "AUTO" : (data.currentMode == MODE_ACTIVE ? "ACTIVE" : "PASSIVE"));
+    Serial.println(data.currentMode == MODE_ACTIVE ? "ACTIVE" : "PASSIVE");
 }
 
 void loop() {
-    // A. Background WiFi/System maintenance
     wifi.handleConnect();
     
-    // B. Process Manual Mode Toggle
-    // Integrator-based class handles the 10k resistor noise filtering
     if (button.isPressed()) {
         cycleSystemMode();
     }
     
-    // C. Process PM Sensor lifecycle based on Mode
     handlePMSensor();
     
-    // D. Update Secondary Sensors (Encapsulated error handling)
     data.temp = dhtSensor.getTemperature();
     data.hum = dhtSensor.getHumidity();
     
-    // E. Refresh Displays & Cloud
     updateUI();
-    handleBlynkTransmission();
+    handleBlynkTransmission(); // Blynk logic remains untouched
     
-    // F. LED stays updated even during sensor sleep
     led.updateLED(data.pm2_5);
 
     delay(20); 
 }
 
 /**
- * @brief Transitions: AUTO -> PASSIVE -> ACTIVE -> AUTO
+ * @brief Simple 2-mode cycle: ACTIVE <-> PASSIVE
+ * Passive starts with Wake (Fan On).
  */
 void cycleSystemMode() {
-    if (data.currentMode == MODE_AUTO) {
+    data.isWarmup = false;
+
+    if (data.currentMode == MODE_ACTIVE) {
         data.currentMode = MODE_PASSIVE;
-        data.isWarmup = false;
-        sensorAwake = false; // Start passive mode with a sleep
-        pmSensor.sleep();
-        Serial.println(F(">> MODE: PASSIVE (Cycle Only)"));
+        sensorAwake = true; // Start Passive with fan ON
+        pmSensor.wakeup();
+        Serial.println(F(">> MODE: PASSIVE (Starting Cycle)"));
     } 
-    else if (data.currentMode == MODE_PASSIVE) {
+    else {
         data.currentMode = MODE_ACTIVE;
-        data.isWarmup = false;
         sensorAwake = true;
         pmSensor.wakeup();
         Serial.println(F(">> MODE: ACTIVE (Always On)"));
-    } 
-    else {
-        data.currentMode = MODE_AUTO;
-        data.isWarmup = true; // Auto starts with warmup
-        bootTime = millis();
-        sensorAwake = true;
-        pmSensor.wakeup();
-        Serial.println(F(">> MODE: AUTO (Warmup then Cycle)"));
     }
+    
     stateTimer = millis();
     isDataFresh = false;
 }
@@ -130,25 +117,13 @@ void handlePMSensor() {
     unsigned long now = millis();
     unsigned long elapsed = now - stateTimer;
 
-    // 1. MODE: ACTIVE - No timers, just stay awake
+    // 1. MODE: ACTIVE - Stay awake forever
     if (data.currentMode == MODE_ACTIVE) {
         if (pmSensor.readData(data.pm1_0, data.pm2_5, data.pm10_0)) isDataFresh = true;
         return;
     }
 
-    // 2. MODE: AUTO (Initial Warmup Phase)
-    if (data.currentMode == MODE_AUTO && data.isWarmup) {
-        if (pmSensor.readData(data.pm1_0, data.pm2_5, data.pm10_0)) {
-            if (now - bootTime > STABILITY_THRESHOLD) isDataFresh = true;
-        }
-        if (now - bootTime >= INITIAL_WARMUP_DURATION) {
-            data.isWarmup = false; // Move to cycle phase
-            stateTimer = now;
-        }
-        return;
-    }
-
-    // 3. CYCLE LOGIC (Used by PASSIVE and Post-Warmup AUTO)
+    // 2. MODE: PASSIVE - (Wake -> Sleep cycle)
     if (sensorAwake) {
         if (pmSensor.readData(data.pm1_0, data.pm2_5, data.pm10_0)) {
             if (elapsed > STABILITY_THRESHOLD) isDataFresh = true;
@@ -173,14 +148,10 @@ void updateUI() {
     data.wifiStatus = wifi.getWifiStatus();
     data.isSleeping = !sensorAwake;
 
-    // Visible Blynk 'B' indicator duration
     data.showBlynkIcon = (now - blynkFlashTimer < BLYNK_ICON_KEEP_ALIVE);
 
-    // Countdown logic
     unsigned long elapsed = now - stateTimer;
-    if (data.isWarmup) {
-        data.countdown = (INITIAL_WARMUP_DURATION - (now - bootTime)) / 1000;
-    } else if (data.currentMode == MODE_ACTIVE) {
+    if (data.currentMode == MODE_ACTIVE) {
         data.countdown = 0; 
     } else {
         unsigned long limit = sensorAwake ? PM_WAKE_DURATION : PM_SLEEP_DURATION;
@@ -193,6 +164,7 @@ void updateUI() {
 
 void handleBlynkTransmission() {
     unsigned long now = millis();
+    // Logic exactly as before
     if ((WiFi.status() == WL_CONNECTED) && isDataFresh && (now - lastBlynk > BLYNK_SEND_INTERVAL)) {
         blynk.sendData(BLYNK_AUTH_TOKEN, data.pm1_0, data.pm2_5, data.pm10_0, data.temp, data.hum);
         lastBlynk = now;

@@ -18,8 +18,8 @@ const int WS2812_PIN        = 15; // D8 (GPIO 15)
 const int BUTTON_PIN        = 13; // D7 (GPIO 13)
 
 // --- Default Settings ---
-// User choice for startup: 0 = AUTO, 1 = ACTIVE, 2 = PASSIVE
-const int DEFAULT_MODE_SETTING = 0; 
+// 0 = MODE_ACTIVE, 1 = MODE_PASSIVE
+const int DEFAULT_MODE_SETTING = 1;
 const uint8_t DEFAULT_OLED_BRIGHTNESS = 150; // 0 to 255
 
 // --- Timing Constants (in Milliseconds) ---

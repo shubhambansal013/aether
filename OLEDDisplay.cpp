@@ -116,11 +116,9 @@ void OLEDDisplay::drawModeIcon(int16_t x, int16_t y, const SystemData& data) {
     display.setCursor(x + 3, y + 1);
     
     // We only show the mode letter. 
-    // Warmup is part of AUTO, so it still shows 'A'.
     switch (data.currentMode) {
-        case MODE_AUTO:    display.print("A"); break;
         case MODE_PASSIVE: display.print("P"); break;
-        case MODE_ACTIVE:  display.print("M"); break; // M for Manual/Max Active
+        case MODE_ACTIVE:  display.print("A"); break; // A for Active
     }
 }
 
