@@ -32,7 +32,7 @@ unsigned long blynkFlashTimer = 0;
 
 bool sensorAwake = true;
 bool isDataFresh = false;
-bool isMuted = false; // Stealth mode flag
+bool isMuted = false; 
 
 // --- Function Prototypes ---
 void handlePMSensor();
@@ -68,29 +68,21 @@ void setup() {
 void loop() {
     wifi.handleConnect();
     
-    // Short Press: Change Active/Passive Mode
-    if (button.isPressed()) {
-        cycleSystemMode();
-    }
-
-    // Long Press: Toggle Display and LED
-    if (button.isLongPressed()) {
-        toggleStealthMode();
-    }
+    if (button.isPressed()) cycleSystemMode();
+    if (button.isLongPressed()) toggleStealthMode();
     
     handlePMSensor();
     
     data.temp = dhtSensor.getTemperature();
     data.hum = dhtSensor.getHumidity();
     
-    // Visual Updates
     if (!isMuted) {
         updateUI();
         led.updateLED(data.pm2_5);
     } else {
-        // Optional: ensure hardware stays off even if background tasks run
+        // Keep both hardware components off
         oled.clear(); 
-        led.updateLED(0); // Assuming 0 turns off/darkens the LED
+        led.turnOff(); 
     }
 
     handleBlynkTransmission();
@@ -101,6 +93,7 @@ void toggleStealthMode() {
     isMuted = !isMuted;
     if (isMuted) {
         oled.clear(); 
+        led.turnOff();
         Serial.println(F(">> STEALTH MODE: ON"));
     } else {
         Serial.println(F(">> STEALTH MODE: OFF"));
@@ -113,12 +106,10 @@ void cycleSystemMode() {
         data.currentMode = MODE_PASSIVE;
         sensorAwake = true;
         pmSensor.wakeup();
-        Serial.println(F(">> MODE: PASSIVE"));
     } else {
         data.currentMode = MODE_ACTIVE;
         sensorAwake = true;
         pmSensor.wakeup();
-        Serial.println(F(">> MODE: ACTIVE"));
     }
     stateTimer = millis();
     isDataFresh = false;
@@ -165,8 +156,6 @@ void updateUI() {
         unsigned long limit = sensorAwake ? PM_WAKE_DURATION : PM_SLEEP_DURATION;
         data.countdown = (limit - elapsed) / 1000;
     }
-    
-    if (data.countdown < 0) data.countdown = 0;
     oled.update(data);
 }
 
