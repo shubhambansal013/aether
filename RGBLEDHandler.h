@@ -10,6 +10,7 @@ public:
     void setup();
     void startupSequence();
     void updateLED(float pm2_5); 
+    void turnOff(); // Added for Stealth Mode
 
 private:
     Adafruit_NeoPixel _strip;
