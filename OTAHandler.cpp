@@ -35,46 +35,55 @@ void OTAHandler::handle() {
 void OTAHandler::checkForUpdates() {
     Serial.println(F("Checking for updates..."));
 
-    std::unique_ptr<BearSSL::WiFiClientSecure> client(new BearSSL::WiFiClientSecure);
-    client->setInsecure();
+    String firmwareUrl = "";
 
-    HTTPClient https;
-    if (https.begin(*client, OTA_MANIFEST_URL)) {
-        https.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-        int httpCode = https.GET();
-        if (httpCode == HTTP_CODE_OK) {
-            String payload = https.getString();
+    {
+        std::unique_ptr<BearSSL::WiFiClientSecure> client(new BearSSL::WiFiClientSecure);
+        client->setInsecure();
+        client->setBufferSizes(1024, 1024);
 
-            StaticJsonDocument<256> doc;
-            DeserializationError error = deserializeJson(doc, payload);
+        HTTPClient https;
+        if (https.begin(*client, OTA_MANIFEST_URL)) {
+            https.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+            int httpCode = https.GET();
+            if (httpCode == HTTP_CODE_OK) {
+                String payload = https.getString();
 
-            if (!error) {
-                const char* newVersion = doc["version"];
-                const char* firmwareUrl = doc["url"];
+                StaticJsonDocument<256> doc;
+                DeserializationError error = deserializeJson(doc, payload);
 
-                if (newVersion && strcmp(newVersion, FIRMWARE_VERSION) != 0) {
-                    Serial.print(F("New version available: "));
-                    Serial.println(newVersion);
+                if (!error) {
+                    const char* newVersion = doc["version"];
+                    const char* url = doc["url"];
 
-                    if (firmwareUrl) {
-                        performUpdate(firmwareUrl);
+                    if (newVersion && strcmp(newVersion, FIRMWARE_VERSION) != 0) {
+                        Serial.print(F("New version available: "));
+                        Serial.println(newVersion);
+
+                        if (url) {
+                            firmwareUrl = String(url);
+                        } else {
+                            Serial.println(F("Error: Firmware URL missing in manifest."));
+                        }
                     } else {
-                        Serial.println(F("Error: Firmware URL missing in manifest."));
+                        Serial.println(F("Firmware is up to date."));
                     }
                 } else {
-                    Serial.println(F("Firmware is up to date."));
+                    Serial.print(F("JSON parsing failed: "));
+                    Serial.println(error.f_str());
                 }
             } else {
-                Serial.print(F("JSON parsing failed: "));
-                Serial.println(error.f_str());
+                Serial.print(F("HTTPS GET failed, error: "));
+                Serial.println(https.errorToString(httpCode).c_str());
             }
+            https.end();
         } else {
-            Serial.print(F("HTTPS GET failed, error: "));
-            Serial.println(https.errorToString(httpCode).c_str());
+            Serial.println(F("Unable to connect to manifest URL"));
         }
-        https.end();
-    } else {
-        Serial.println(F("Unable to connect to manifest URL"));
+    } // client and https go out of scope here, freeing memory
+
+    if (firmwareUrl.length() > 0) {
+        performUpdate(firmwareUrl.c_str());
     }
 }
 
@@ -87,6 +96,7 @@ void OTAHandler::performUpdate(const char* firmwareUrl) {
 
     std::unique_ptr<BearSSL::WiFiClientSecure> client(new BearSSL::WiFiClientSecure);
     client->setInsecure();
+    client->setBufferSizes(1024, 1024);
 
     // The update process is blocking and will reboot on success
     ESPhttpUpdate.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
