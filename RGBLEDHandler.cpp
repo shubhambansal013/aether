@@ -19,19 +19,18 @@ void RGBLEDHandler::setLEDColor(uint32_t hex) {
     _strip.show();
 }
 
+void RGBLEDHandler::turnOff() {
+    setLEDColor(0);
+}
+
 void RGBLEDHandler::startupSequence() {
     setLEDColor(0xFF0000); delay(500); // Red
     setLEDColor(0x00FF00); delay(500); // Green
     setLEDColor(0x0000FF); delay(500); // Blue
-    setLEDColor(0);
+    turnOff();
 }
 
-void RGBLEDHandler::updateLED(float pm2_5, bool enabled) {
-    if (!enabled) {
-        setLEDColor(0);
-        return;
-    }
-
+void RGBLEDHandler::updateLED(float pm2_5) {
     if (pm2_5 < 0) { 
         setLEDColor(C_BLUE); // Stay blue if no sensor data received yet
         return; 

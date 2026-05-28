@@ -119,7 +119,6 @@ void OLEDDisplay::drawModeIcon(int16_t x, int16_t y, const SystemData& data) {
     switch (data.currentMode) {
         case MODE_PASSIVE: display.print("P"); break;
         case MODE_ACTIVE:  display.print("A"); break; // A for Active
-        case MODE_NIGHT:   display.print("N"); break;
     }
 }
 

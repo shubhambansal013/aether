@@ -1,5 +1,5 @@
-#ifndef BUTTON_HANDLER_H
-#define BUTTON_HANDLER_H
+#ifndef BUTTONHANDLER_H
+#define BUTTONHANDLER_H
 
 #include <Arduino.h>
 
@@ -7,15 +7,15 @@ class ButtonHandler {
 public:
     ButtonHandler(int pin);
     void setup();
-    
-    // Returns true only ONCE per physical press
-    bool isPressed();
+    bool isPressed();       // Returns true on short release
+    bool isLongPressed();   // Returns true immediately when time threshold met
 
 private:
     int _pin;
     bool _lastState;
     unsigned long _lastDebounceTime;
-    static const unsigned long DEBOUNCE_DELAY = 250; 
+    unsigned long _pressStartTime;
+    bool _longPressTriggered;
 };
 
 #endif

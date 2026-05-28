@@ -27,7 +27,8 @@ WiFiHandler wifi;
 BlynkHandler blynk;
 ButtonHandler button(BUTTON_PIN);
 ResetHandler resetHandler(wifi);
-const int SETTINGS_EEPROM_ADDR = 10;
+const int ADDR_MODE  = 10;
+const int ADDR_MUTED = 14;
 
 // --- Timers & Internal State ---
 unsigned long lastBlynk = 0;
@@ -58,7 +59,7 @@ void setup() {
     resetHandler.checkPowerCycles();
     loadSettings();
 
-    if (data.currentMode != MODE_NIGHT) {
+    if (!data.isMuted) {
         led.startupSequence();
     }
     
@@ -87,16 +88,29 @@ void loop() {
         cycleSystemMode();
     }
     
+    if (button.isLongPressed()) {
+        data.isMuted = !data.isMuted;
+        if (data.isMuted) {
+            oled.clear();
+            led.turnOff();
+            Serial.println(F(">> STEALTH MODE: ON"));
+        } else {
+            Serial.println(F(">> STEALTH MODE: OFF"));
+        }
+        saveSettings();
+    }
+
     handlePMSensor();
     
     data.temp = dhtSensor.getTemperature();
     data.hum = dhtSensor.getHumidity();
     
-    updateUI();
-    handleBlynkTransmission(); // Blynk logic remains untouched
+    if (!data.isMuted) {
+        updateUI();
+        led.updateLED(data.pm2_5);
+    }
     
-    led.updateLED(data.pm2_5, data.currentMode != MODE_NIGHT);
-
+    handleBlynkTransmission(); // Blynk logic remains untouched
     delay(20); 
 }
 
@@ -113,12 +127,6 @@ void cycleSystemMode() {
         pmSensor.wakeup();
         Serial.println(F(">> MODE: PASSIVE (Starting Cycle)"));
     } 
-    else if (data.currentMode == MODE_PASSIVE) {
-        data.currentMode = MODE_NIGHT;
-        sensorAwake = true;
-        pmSensor.wakeup();
-        Serial.println(F(">> MODE: NIGHT (Passive + LED OFF)"));
-    }
     else {
         data.currentMode = MODE_ACTIVE;
         sensorAwake = true;
@@ -141,7 +149,7 @@ void handlePMSensor() {
         return;
     }
 
-    // 2. MODE: PASSIVE or NIGHT - (Wake -> Sleep cycle)
+    // 2. MODE: PASSIVE - (Wake -> Sleep cycle)
     if (sensorAwake) {
         if (pmSensor.readData(data.pm1_0, data.pm2_5, data.pm10_0)) {
             if (elapsed > STABILITY_THRESHOLD) isDataFresh = true;
@@ -192,23 +200,35 @@ void handleBlynkTransmission() {
 }
 
 void saveSettings() {
-    EEPROM.put(SETTINGS_EEPROM_ADDR, (int)data.currentMode);
+    EEPROM.put(ADDR_MODE, (int)data.currentMode);
+    EEPROM.put(ADDR_MUTED, (int)data.isMuted);
     EEPROM.commit();
     Serial.println(F(">> Settings Saved to EEPROM."));
 }
 
 void loadSettings() {
     int storedMode;
-    EEPROM.get(SETTINGS_EEPROM_ADDR, storedMode);
+    int storedMuted;
+    EEPROM.get(ADDR_MODE, storedMode);
+    EEPROM.get(ADDR_MUTED, storedMuted);
 
-    // Validate stored value (0: ACTIVE, 1: PASSIVE, 2: NIGHT)
-    if (storedMode >= 0 && storedMode <= 2) {
+    // Validate stored mode (0: ACTIVE, 1: PASSIVE)
+    if (storedMode >= 0 && storedMode <= 1) {
         data.currentMode = (SystemMode)storedMode;
-        Serial.print(F(">> Settings Loaded. Mode: "));
-        Serial.println(storedMode);
+        Serial.print(F(">> Loaded Mode: "));
+        Serial.println(storedMode == MODE_ACTIVE ? "ACTIVE" : "PASSIVE");
     } else {
         data.currentMode = (SystemMode)DEFAULT_MODE_SETTING;
-        Serial.println(F(">> EEPROM Empty or Corrupt. Using Default Mode."));
-        saveSettings();
+        Serial.println(F(">> EEPROM Mode Empty/Corrupt. Using Default."));
+    }
+
+    // Validate stored muted state
+    if (storedMuted == 0 || storedMuted == 1) {
+        data.isMuted = (bool)storedMuted;
+        Serial.print(F(">> Loaded Stealth: "));
+        Serial.println(data.isMuted ? "ON" : "OFF");
+    } else {
+        data.isMuted = false;
+        Serial.println(F(">> EEPROM Muted Empty/Corrupt. Defaulting OFF."));
     }
 }
