@@ -51,17 +51,19 @@ void OTAHandler::checkForUpdates() {
                 const char* newVersion = doc["version"];
                 const char* firmwareUrl = doc["url"];
 
-                if (newVersion && strcmp(newVersion, FIRMWARE_VERSION) != 0) {
+                if (newVersion) {
                     Serial.print(F("New version available: "));
                     Serial.println(newVersion);
 
-                    if (firmwareUrl) {
-                        performUpdate(firmwareUrl);
+                    if (strcmp(newVersion, FIRMWARE_VERSION) != 0) {
+                        if (firmwareUrl) {
+                            performUpdate(firmwareUrl);
+                        } else {
+                            Serial.println(F("Error: Firmware URL missing in manifest."));
+                        }
                     } else {
-                        Serial.println(F("Error: Firmware URL missing in manifest."));
+                        Serial.println(F("Firmware is up to date."));
                     }
-                } else {
-                    Serial.println(F("Firmware is up to date."));
                 }
             } else {
                 Serial.print(F("JSON parsing failed: "));
