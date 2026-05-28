@@ -35,11 +35,13 @@ DHTSensor::DHTSensor(int p) {}
 void OLEDDisplay::setup() {}
 void OLEDDisplay::update(const SystemData& d) {}
 void OLEDDisplay::clear() {}
+void OLEDDisplay::printMessage(String l1, String l2) {}
 OLEDDisplay::OLEDDisplay(int sda, int scl) {}
 
 void RGBLEDHandler::setup() {}
 void RGBLEDHandler::updateLED(float pm) {}
 void RGBLEDHandler::turnOff() {}
+void RGBLEDHandler::setColor(uint32_t hex) {}
 void RGBLEDHandler::startupSequence() {}
 RGBLEDHandler::RGBLEDHandler(int p) : _strip(1, p, 0) {}
 
