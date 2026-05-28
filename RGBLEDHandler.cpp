@@ -26,7 +26,12 @@ void RGBLEDHandler::startupSequence() {
     setLEDColor(0);
 }
 
-void RGBLEDHandler::updateLED(float pm2_5) {
+void RGBLEDHandler::updateLED(float pm2_5, bool enabled) {
+    if (!enabled) {
+        setLEDColor(0);
+        return;
+    }
+
     if (pm2_5 < 0) { 
         setLEDColor(C_BLUE); // Stay blue if no sensor data received yet
         return; 

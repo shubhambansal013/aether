@@ -5,7 +5,8 @@
 
 enum SystemMode {
     MODE_ACTIVE,  // Continuous Wake
-    MODE_PASSIVE  // Wake/Sleep Cycle (Starts with Wake)
+    MODE_PASSIVE, // Wake/Sleep Cycle (Starts with Wake)
+    MODE_NIGHT    // Wake/Sleep Cycle (Starts with Wake) - LED OFF
 };
 
 struct SystemData {

@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <EEPROM.h>
 #include "Config.h"
 #include "SystemData.h"
 #include "WiFiHandler.h"
@@ -8,6 +9,7 @@
 #include "RGBLEDHandler.h"
 #include "BlynkHandler.h"
 #include "ButtonHandler.h"
+#include "ResetHandler.h"
 #include "blynk_config.h"
 
 // --- Shield for ESP8266 IRAM Errors ---
@@ -24,6 +26,8 @@ RGBLEDHandler led(WS2812_PIN);
 WiFiHandler wifi;
 BlynkHandler blynk;
 ButtonHandler button(BUTTON_PIN);
+ResetHandler resetHandler(wifi);
+const int SETTINGS_EEPROM_ADDR = 10;
 
 // --- Timers & Internal State ---
 unsigned long lastBlynk = 0;
@@ -39,23 +43,30 @@ void handlePMSensor();
 void updateUI();
 void handleBlynkTransmission();
 void cycleSystemMode();
+void saveSettings();
+void loadSettings();
 
 void setup() {
     Serial.begin(115200);
+    EEPROM.begin(512);
     
     // 1. Initialize Hardware
     button.setup();
     oled.setup();
     led.setup();
-    led.startupSequence();
+
+    resetHandler.checkPowerCycles();
+    loadSettings();
+
+    if (data.currentMode != MODE_NIGHT) {
+        led.startupSequence();
+    }
     
     pmSensor.begin(9600);
     dhtSensor.setup();
     wifi.startConnect();
 
     // 2. Initial Mode (Simplified to 2 Phases)
-    // We assume Config.h now only uses MODE_ACTIVE or MODE_PASSIVE
-    data.currentMode = (SystemMode)DEFAULT_MODE_SETTING;
     data.isWarmup = false; 
     
     // Both modes start with sensor awake
@@ -84,7 +95,7 @@ void loop() {
     updateUI();
     handleBlynkTransmission(); // Blynk logic remains untouched
     
-    led.updateLED(data.pm2_5);
+    led.updateLED(data.pm2_5, data.currentMode != MODE_NIGHT);
 
     delay(20); 
 }
@@ -102,6 +113,12 @@ void cycleSystemMode() {
         pmSensor.wakeup();
         Serial.println(F(">> MODE: PASSIVE (Starting Cycle)"));
     } 
+    else if (data.currentMode == MODE_PASSIVE) {
+        data.currentMode = MODE_NIGHT;
+        sensorAwake = true;
+        pmSensor.wakeup();
+        Serial.println(F(">> MODE: NIGHT (Passive + LED OFF)"));
+    }
     else {
         data.currentMode = MODE_ACTIVE;
         sensorAwake = true;
@@ -109,6 +126,7 @@ void cycleSystemMode() {
         Serial.println(F(">> MODE: ACTIVE (Always On)"));
     }
     
+    saveSettings();
     stateTimer = millis();
     isDataFresh = false;
 }
@@ -123,7 +141,7 @@ void handlePMSensor() {
         return;
     }
 
-    // 2. MODE: PASSIVE - (Wake -> Sleep cycle)
+    // 2. MODE: PASSIVE or NIGHT - (Wake -> Sleep cycle)
     if (sensorAwake) {
         if (pmSensor.readData(data.pm1_0, data.pm2_5, data.pm10_0)) {
             if (elapsed > STABILITY_THRESHOLD) isDataFresh = true;
@@ -170,5 +188,27 @@ void handleBlynkTransmission() {
         lastBlynk = now;
         blynkFlashTimer = now; 
         isDataFresh = false; 
+    }
+}
+
+void saveSettings() {
+    EEPROM.put(SETTINGS_EEPROM_ADDR, (int)data.currentMode);
+    EEPROM.commit();
+    Serial.println(F(">> Settings Saved to EEPROM."));
+}
+
+void loadSettings() {
+    int storedMode;
+    EEPROM.get(SETTINGS_EEPROM_ADDR, storedMode);
+
+    // Validate stored value (0: ACTIVE, 1: PASSIVE, 2: NIGHT)
+    if (storedMode >= 0 && storedMode <= 2) {
+        data.currentMode = (SystemMode)storedMode;
+        Serial.print(F(">> Settings Loaded. Mode: "));
+        Serial.println(storedMode);
+    } else {
+        data.currentMode = (SystemMode)DEFAULT_MODE_SETTING;
+        Serial.println(F(">> EEPROM Empty or Corrupt. Using Default Mode."));
+        saveSettings();
     }
 }

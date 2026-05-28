@@ -9,7 +9,7 @@ public:
     RGBLEDHandler(int pin);
     void setup();
     void startupSequence();
-    void updateLED(float pm2_5); 
+    void updateLED(float pm2_5, bool enabled = true);
 
 private:
     Adafruit_NeoPixel _strip;
