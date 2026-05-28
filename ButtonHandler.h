@@ -13,6 +13,7 @@ public:
 private:
     int _pin;
     bool _lastState;
+    bool _confirmedState;
     unsigned long _lastDebounceTime;
     unsigned long _pressStartTime;
     bool _longPressTriggered;
