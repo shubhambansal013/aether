@@ -3,8 +3,14 @@
 #define OTA_HANDLER_H
 
 #include <Arduino.h>
+
+#ifdef UNIT_TEST
+#include "OLEDDisplayMock.h"
+#include "RGBLEDHandlerMock.h"
+#else
 #include "OLEDDisplay.h"
 #include "RGBLEDHandler.h"
+#endif
 
 /**
  * @brief Handles Over-the-Air (OTA) firmware updates for the ESP8266.

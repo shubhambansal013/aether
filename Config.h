@@ -37,6 +37,6 @@ static const unsigned long OTA_CHECK_INTERVAL = 60000; // 1 min for testing — 
 static const char* OTA_MANIFEST_URL = "https://shubhambansal013.github.io/aether/version.json";
 
 // --- Meta ---
-static const char* FIRMWARE_VERSION = "ec4c8e0"; // overwritten by CI via sed before compile — do not change manually
+static const char* FIRMWARE_VERSION = "931e9ee"; // overwritten by CI via sed before compile — do not change manually
 
 #endif

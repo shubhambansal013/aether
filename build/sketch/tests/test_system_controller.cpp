@@ -1,9 +1,21 @@
 #line 1 "/home/runner/work/aether/aether/tests/test_system_controller.cpp"
 #include "Arduino.h"
+#include <vector>
+#include <assert.h>
+#include <iostream>
+
 #include "EEPROM.h"
 #include "ESP8266WiFi.h"
 #include "ESP8266httpUpdate.h"
-#include <vector>
+
+// System components mocks
+#include "PMSensorMock.h"
+#include "DHTSensorMock.h"
+#include "OLEDDisplayMock.h"
+#include "RGBLEDHandlerMock.h"
+#include "WiFiHandlerMock.h"
+#include "BlynkHandlerMock.h"
+#include "ButtonHandlerMock.h"
 
 unsigned long mock_millis = 0;
 unsigned long millis() { return mock_millis; }
@@ -17,54 +29,9 @@ EEPROMMock EEPROM;
 ESP8266HTTPUpdate ESPhttpUpdate;
 
 #include "../SystemController.h"
-#include <assert.h>
-
-// Minimal mocks for other classes to make it compile and testable
-// We might need to mock them more if we want to test interactions
-
-void PMSensor::begin(long b) {}
-void PMSensor::sleep() {}
-void PMSensor::wakeup() {}
-bool PMSensor::readData(float& pm1, float& pm2, float& pm10) { pm1 = 1.0; pm2 = 2.0; pm10 = 3.0; return true; }
-PMSensor::PMSensor(int r, int s) : _pmSerial(r, s), _setPin(s) {}
-
-void DHTSensor::setup() {}
-float DHTSensor::getTemperature() { return 25.0; }
-float DHTSensor::getHumidity() { return 50.0; }
-DHTSensor::DHTSensor(int p) {}
-
-void OLEDDisplay::setup() {}
-void OLEDDisplay::update(const SystemData& d) {}
-void OLEDDisplay::clear() {}
-void OLEDDisplay::printMessage(String l1, String l2) {}
-OLEDDisplay::OLEDDisplay(int sda, int scl) {}
-
-void RGBLEDHandler::setup() {}
-void RGBLEDHandler::updateLED(float pm) {}
-void RGBLEDHandler::turnOff() {}
-void RGBLEDHandler::setColor(uint32_t hex) {}
-void RGBLEDHandler::startupSequence() {}
-RGBLEDHandler::RGBLEDHandler(int p) : _strip(1, p, 0) {}
-
-void WiFiHandler::startConnect() {}
-bool WiFiHandler::handleConnect() { return true; }
-String WiFiHandler::getWifiStatus() { return "Connected"; }
-void WiFiHandler::resetSettings() {}
-
-void BlynkHandler::sendData(const char* a, float p1, float p2, float p10, float t, float h) {}
-BlynkHandler::BlynkHandler() {}
-
-void ButtonHandler::setup() {}
-bool ButtonHandler::isPressed() { return false; }
-bool ButtonHandler::isLongPressed() { return false; }
-ButtonHandler::ButtonHandler(int p) {}
-
-// SoftwareSerial mock if needed
-#include <SoftwareSerial.h>
-SoftwareSerial::SoftwareSerial(int rx, int tx) {}
-void SoftwareSerial::begin(long b) {}
 
 void test_initial_state() {
+    std::cout << "Running test_initial_state..." << std::endl;
     PMSensor pm(0,0); DHTSensor dht(0); OLEDDisplay oled(0,0);
     RGBLEDHandler led(0); WiFiHandler wifi; BlynkHandler blynk; ButtonHandler button(0);
     SystemController sc(pm, dht, oled, led, wifi, blynk, button);
@@ -82,32 +49,116 @@ void test_initial_state() {
 }
 
 void test_mode_cycling() {
+    std::cout << "Running test_mode_cycling..." << std::endl;
     PMSensor pm(0,0); DHTSensor dht(0); OLEDDisplay oled(0,0);
     RGBLEDHandler led(0); WiFiHandler wifi; BlynkHandler blynk; ButtonHandler button(0);
     SystemController sc(pm, dht, oled, led, wifi, blynk, button);
 
-    sc.cycleSystemMode();
+    sc.setup(); // Default is MODE_PASSIVE if not in EEPROM, or from DEFAULT_MODE_SETTING
+
+    // Set to ACTIVE
+    if (sc.getData().currentMode != MODE_ACTIVE) sc.cycleSystemMode();
     assert(sc.getData().currentMode == MODE_ACTIVE);
+
     sc.cycleSystemMode();
     assert(sc.getData().currentMode == MODE_PASSIVE);
 }
 
-void test_stealth_mode() {
+void test_stealth_mode_suppression() {
+    std::cout << "Running test_stealth_mode_suppression..." << std::endl;
     PMSensor pm(0,0); DHTSensor dht(0); OLEDDisplay oled(0,0);
     RGBLEDHandler led(0); WiFiHandler wifi; BlynkHandler blynk; ButtonHandler button(0);
     SystemController sc(pm, dht, oled, led, wifi, blynk, button);
 
-    assert(sc.isMuted() == false);
+    sc.setup();
+    // Ensure not muted
+    if (sc.isMuted()) sc.toggleStealthMode();
+
+    oled.updateCount = 0;
+    led.updateCount = 0;
+
+    sc.update();
+    assert(oled.updateCount > 0);
+    assert(led.updateCount > 0);
+
     sc.toggleStealthMode();
     assert(sc.isMuted() == true);
-    sc.toggleStealthMode();
-    assert(sc.isMuted() == false);
+
+    oled.updateCount = 0;
+    led.updateCount = 0;
+    oled.clearCount = 0;
+    led.turnOffCount = 0;
+
+    sc.update();
+    assert(oled.updateCount == 0);
+    assert(led.updateCount == 0);
+    assert(oled.clearCount > 0);
+    assert(led.turnOffCount > 0);
+}
+
+void test_passive_mode_cycle() {
+    std::cout << "Running test_passive_mode_cycle..." << std::endl;
+    PMSensor pm(0,0); DHTSensor dht(0); OLEDDisplay oled(0,0);
+    RGBLEDHandler led(0); WiFiHandler wifi; BlynkHandler blynk; ButtonHandler button(0);
+    SystemController sc(pm, dht, oled, led, wifi, blynk, button);
+
+    EEPROM.put(ADDR_MODE, (byte)MODE_PASSIVE);
+    mock_millis = 1000;
+    sc.setup();
+
+    assert(sc.getData().currentMode == MODE_PASSIVE);
+    assert(pm.sleepCount == 0);
+
+    // Stay awake for PM_WAKE_DURATION (32s)
+    mock_millis += 31000;
+    sc.update();
+    assert(pm.sleepCount == 0);
+
+    mock_millis += 2000; // Total 33s since setup
+    sc.update();
+    assert(pm.sleepCount == 1); // Should have called sleep
+
+    // Stay asleep for PM_SLEEP_DURATION (60s)
+    mock_millis += 59000;
+    sc.update();
+    assert(pm.wakeupCount == 1); // Initial wakeup in setup is 1
+
+    assert(pm.wakeupCount == 1);
+    mock_millis += 2000;
+    sc.update();
+    assert(pm.wakeupCount == 2);
+}
+
+void test_blynk_transmission_active() {
+    std::cout << "Running test_blynk_transmission_active..." << std::endl;
+    PMSensor pm(0,0); DHTSensor dht(0); OLEDDisplay oled(0,0);
+    RGBLEDHandler led(0); WiFiHandler wifi; BlynkHandler blynk; ButtonHandler button(0);
+    SystemController sc(pm, dht, oled, led, wifi, blynk, button);
+
+    EEPROM.put(ADDR_MODE, (byte)MODE_ACTIVE);
+    mock_millis = 100000;
+    sc.setup();
+
+    blynk.sendCount = 0;
+    pm.mock_readData_return = true;
+    sc.update();
+    assert(blynk.sendCount == 1);
+
+    mock_millis += 30000;
+    sc.update();
+    assert(blynk.sendCount == 1);
+
+    mock_millis += 31000;
+    sc.update();
+    assert(blynk.sendCount == 2);
 }
 
 int main() {
     test_initial_state();
     test_mode_cycling();
-    test_stealth_mode();
-    std::cout << "All tests passed!" << std::endl;
+    test_stealth_mode_suppression();
+    test_passive_mode_cycle();
+    test_blynk_transmission_active();
+    std::cout << "All SystemController tests passed!" << std::endl;
     return 0;
 }

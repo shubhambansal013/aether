@@ -5,6 +5,16 @@
 #include <Arduino.h>
 #include "Config.h"
 #include "SystemData.h"
+
+#ifdef UNIT_TEST
+#include "PMSensorMock.h"
+#include "DHTSensorMock.h"
+#include "OLEDDisplayMock.h"
+#include "RGBLEDHandlerMock.h"
+#include "WiFiHandlerMock.h"
+#include "BlynkHandlerMock.h"
+#include "ButtonHandlerMock.h"
+#else
 #include "PMSensor.h"
 #include "DHTSensor.h"
 #include "OLEDDisplay.h"
@@ -12,6 +22,8 @@
 #include "WiFiHandler.h"
 #include "BlynkHandler.h"
 #include "ButtonHandler.h"
+#endif
+
 #include "OTAHandler.h"
 
 class SystemController {
