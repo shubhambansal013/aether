@@ -11,10 +11,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Compile and run tests
+      - name: Compile and run SystemController tests
         run: |
-          g++ -I./ -I./tests/ tests/test_system_controller.cpp SystemController.cpp OTAHandler.cpp -o tests/runner
-          ./tests/runner
+          g++ -DUNIT_TEST -I./tests/ -I./ tests/test_system_controller.cpp SystemController.cpp OTAHandler.cpp tests/PMSensorMock.cpp tests/DHTSensorMock.cpp tests/OLEDDisplayMock.cpp tests/RGBLEDHandlerMock.cpp tests/WiFiHandlerMock.cpp tests/BlynkHandlerMock.cpp tests/ButtonHandlerMock.cpp tests/SoftwareSerial.cpp -o tests/sc_runner
+          ./tests/sc_runner
+      - name: Compile and run PMSensor tests
+        run: |
+          g++ -I./tests/ -I./ tests/test_pm_sensor.cpp PMSensor.cpp tests/SoftwareSerial.cpp -o tests/pm_runner
+          ./tests/pm_runner
+      - name: Compile and run ButtonHandler tests
+        run: |
+          g++ -I./tests/ -I./ tests/test_button.cpp -o tests/button_runner
+          ./tests/button_runner
 
   arduino-build:
     runs-on: ubuntu-latest
