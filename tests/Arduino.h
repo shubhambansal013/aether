@@ -14,6 +14,7 @@ class WiFiClient {};
 #define F(x) x
 #define OUTPUT 0x1
 #define INPUT 0x0
+#define INPUT_PULLUP 0x2
 #define LOW 0x0
 #define HIGH 0x1
 #define WL_CONNECTED 3
