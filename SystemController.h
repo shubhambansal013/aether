@@ -11,6 +11,7 @@
 #include "WiFiHandler.h"
 #include "BlynkHandler.h"
 #include "ButtonHandler.h"
+#include "OTAHandler.h"
 
 class SystemController {
 public:
@@ -97,6 +98,7 @@ private:
     WiFiHandler& _wifi;
     BlynkHandler& _blynk;
     ButtonHandler& _button;
+    OTAHandler _ota;
 
     unsigned long _lastBlynk = 0;
     unsigned long _stateTimer = 0;

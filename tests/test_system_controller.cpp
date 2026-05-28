@@ -1,5 +1,7 @@
 #include "Arduino.h"
 #include "EEPROM.h"
+#include "ESP8266WiFi.h"
+#include "ESP8266httpUpdate.h"
 #include <vector>
 
 unsigned long mock_millis = 0;
@@ -11,6 +13,7 @@ void digitalWrite(int pin, int val) {}
 SerialMock Serial;
 WiFiMock WiFi;
 EEPROMMock EEPROM;
+ESP8266HTTPUpdate ESPhttpUpdate;
 
 #include "../SystemController.h"
 #include <assert.h>

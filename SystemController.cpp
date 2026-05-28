@@ -32,6 +32,7 @@ void SystemController::setup() {
 
 void SystemController::update() {
     _wifi.handleConnect();
+    _ota.handle();
     processInputs();
     updateSensors();
     updateOutputs();

@@ -1,0 +1,43 @@
+#ifndef OTA_HANDLER_H
+#define OTA_HANDLER_H
+
+#include <Arduino.h>
+
+/**
+ * @brief Handles Over-the-Air (OTA) firmware updates for the ESP8266.
+ *
+ * This class periodically checks a remote JSON manifest for version changes
+ * and performs a firmware update using the ESP8266httpUpdate library.
+ */
+class OTAHandler {
+public:
+    /**
+     * @brief Construct a new OTAHandler object.
+     */
+    OTAHandler();
+
+    /**
+     * @brief Periodically checks for firmware updates.
+     *
+     * This method should be called in the main loop. It respects the
+     * OTA_CHECK_INTERVAL defined in Config.h.
+     */
+    void handle();
+
+private:
+    /**
+     * @brief Fetches the version manifest from GitHub and compares it with the current version.
+     */
+    void checkForUpdates();
+
+    /**
+     * @brief Downloads and installs the new firmware binary.
+     *
+     * @param firmwareUrl The direct HTTPS URL to the firmware .bin file.
+     */
+    void performUpdate(const char* firmwareUrl);
+
+    unsigned long _lastCheck = 0; ///< Timestamp of the last update check.
+};
+
+#endif

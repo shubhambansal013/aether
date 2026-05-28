@@ -9,6 +9,8 @@
 typedef uint8_t byte;
 typedef std::string String;
 
+class WiFiClient {};
+
 #define F(x) x
 #define OUTPUT 0x1
 #define INPUT 0x0
