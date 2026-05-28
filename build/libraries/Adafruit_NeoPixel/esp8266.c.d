@@ -1,0 +1,22 @@
+/home/runner/work/aether/aether/build/libraries/Adafruit_NeoPixel/esp8266.c.o: \
+ /home/runner/Arduino/libraries/Adafruit_NeoPixel/esp8266.c \
+ /home/runner/.arduino15/packages/esp8266/hardware/esp8266/3.1.2/cores/esp8266/CommonHFile.h \
+ /home/runner/work/aether/aether/build/core/aether.ino.globals.h \
+ /home/runner/.arduino15/packages/esp8266/hardware/esp8266/3.1.2/cores/esp8266/Arduino.h \
+ /home/runner/.arduino15/packages/esp8266/hardware/esp8266/3.1.2/cores/esp8266/umm_malloc/umm_malloc_cfgport.h \
+ /home/runner/.arduino15/packages/esp8266/hardware/esp8266/3.1.2/cores/esp8266/stdlib_noniso.h \
+ /home/runner/.arduino15/packages/esp8266/hardware/esp8266/3.1.2/cores/esp8266/binary.h \
+ /home/runner/.arduino15/packages/esp8266/hardware/esp8266/3.1.2/cores/esp8266/esp8266_peri.h \
+ /home/runner/.arduino15/packages/esp8266/hardware/esp8266/3.1.2/tools/sdk/include/c_types.h \
+ /home/runner/.arduino15/packages/esp8266/hardware/esp8266/3.1.2/cores/esp8266/esp8266_undocumented.h \
+ /home/runner/.arduino15/packages/esp8266/hardware/esp8266/3.1.2/tools/sdk/include/eagle_soc.h \
+ /home/runner/.arduino15/packages/esp8266/hardware/esp8266/3.1.2/tools/sdk/include/spi_flash.h \
+ /home/runner/.arduino15/packages/esp8266/hardware/esp8266/3.1.2/tools/sdk/include/spi_flash_geometry.h \
+ /home/runner/.arduino15/packages/esp8266/hardware/esp8266/3.1.2/cores/esp8266/twi.h \
+ /home/runner/.arduino15/packages/esp8266/hardware/esp8266/3.1.2/cores/esp8266/Arduino.h \
+ /home/runner/.arduino15/packages/esp8266/hardware/esp8266/3.1.2/cores/esp8266/core_esp8266_features.h \
+ /home/runner/.arduino15/packages/esp8266/hardware/esp8266/3.1.2/cores/esp8266/core_esp8266_version.h \
+ /home/runner/.arduino15/packages/esp8266/hardware/esp8266/3.1.2/cores/esp8266/core_version.h \
+ /home/runner/.arduino15/packages/esp8266/hardware/esp8266/3.1.2/cores/esp8266/debug.h \
+ /home/runner/.arduino15/packages/esp8266/hardware/esp8266/3.1.2/variants/nodemcu/pins_arduino.h \
+ /home/runner/.arduino15/packages/esp8266/hardware/esp8266/3.1.2/variants/nodemcu/../generic/common.h

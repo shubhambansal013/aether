@@ -33,10 +33,10 @@ static const unsigned long DEBOUNCE_DELAY          = 50;
 static const unsigned long BUTTON_LONG_PRESS_TIME  = 2000; 
 
 // --- OTA Settings ---
-static const unsigned long OTA_CHECK_INTERVAL = 60000;
-static const char* OTA_MANIFEST_URL = "https://github.com/shubhambansal013/aether/releases/download/latest/version.json";
+static const unsigned long OTA_CHECK_INTERVAL = 60000; // 1 min for testing — change to 3600000 (1hr) before production
+static const char* OTA_MANIFEST_URL = "https://shubhambansal013.github.io/aether/version.json";
 
 // --- Meta ---
-static const char* FIRMWARE_VERSION = "dev";
+static const char* FIRMWARE_VERSION = "ec4c8e0"; // overwritten by CI via sed before compile — do not change manually
 
 #endif
