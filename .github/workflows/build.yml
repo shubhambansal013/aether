@@ -31,11 +31,13 @@ jobs:
           arduino-cli lib install "Adafruit NeoPixel"
           arduino-cli lib install "ESP8266-ping"
 
-      - name: ⚙️ Update Version in Config.h
+      - name: ⚙️ Update FIRMWARE_VERSION in Config.h
         run: |
           SHORT_SHA=$(git rev-parse --short HEAD)
           echo "SHORT_SHA=$SHORT_SHA" >> $GITHUB_ENV
-          sed -i "s/static const char\* FIRMWARE_VERSION = \".*\";/static const char\* FIRMWARE_VERSION = \"$SHORT_SHA\";/" Config.h
+          sed -i "s/static const char\* FIRMWARE_VERSION = \".*\";/static const char* FIRMWARE_VERSION = \"$SHORT_SHA\";/" Config.h
+          echo "--- Verifying Config.h patch ---"
+          grep FIRMWARE_VERSION Config.h
 
       - name: 🔨 Compile Firmware
         run: |
@@ -45,21 +47,15 @@ jobs:
 
       - name: 📄 Generate version.json
         run: |
-          echo "{\"version\": \"${{ env.SHORT_SHA }}\", \"url\": \"https://github.com/shubhambansal013/aether/releases/download/latest/firmware.bin\"}" > version.json
+          echo "{\"version\": \"${{ env.SHORT_SHA }}\", \"url\": \"https://shubhambansal013.github.io/aether/firmware.bin\"}" > version.json
+          echo "--- version.json contents ---"
+          cat version.json
 
-      - name: 📤 Create/Update Release
-        uses: softprops/action-gh-release@v2
+      - name: 🚀 Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          files: |
-            firmware.bin
-            version.json
-          tag_name: latest
-          name: Latest OTA Release
-          body: |
-            Automated OTA build from main branch.
-            Firmware Version (Git SHA): ${{ env.SHORT_SHA }}
-          prerelease: false
-          draft: false
-          make_latest: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./
+          include_files: firmware.bin,version.json
+          keep_files: false
