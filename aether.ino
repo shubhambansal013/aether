@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <EEPROM.h>
 #include "Config.h"
 #include "SystemData.h"
 #include "WiFiHandler.h"
@@ -24,6 +25,8 @@ RGBLEDHandler led(WS2812_PIN);
 WiFiHandler wifi;
 BlynkHandler blynk;
 ButtonHandler button(BUTTON_PIN);
+const int ADDR_MODE  = 10;
+const int ADDR_MUTED = 14;
 
 // --- Timers & Internal State ---
 unsigned long lastBlynk = 0;
@@ -39,23 +42,29 @@ void handlePMSensor();
 void updateUI();
 void handleBlynkTransmission();
 void cycleSystemMode();
+void saveSettings();
+void loadSettings();
 
 void setup() {
     Serial.begin(115200);
+    EEPROM.begin(512);
     
     // 1. Initialize Hardware
     button.setup();
     oled.setup();
     led.setup();
-    led.startupSequence();
+
+    loadSettings();
+
+    if (!data.isMuted) {
+        led.startupSequence();
+    }
     
     pmSensor.begin(9600);
     dhtSensor.setup();
     wifi.startConnect();
 
     // 2. Initial Mode (Simplified to 2 Phases)
-    // We assume Config.h now only uses MODE_ACTIVE or MODE_PASSIVE
-    data.currentMode = (SystemMode)DEFAULT_MODE_SETTING;
     data.isWarmup = false; 
     
     // Both modes start with sensor awake
@@ -76,16 +85,29 @@ void loop() {
         cycleSystemMode();
     }
     
+    if (button.isLongPressed()) {
+        data.isMuted = !data.isMuted;
+        if (data.isMuted) {
+            oled.clear();
+            led.turnOff();
+            Serial.println(F(">> STEALTH MODE: ON"));
+        } else {
+            Serial.println(F(">> STEALTH MODE: OFF"));
+        }
+        saveSettings();
+    }
+
     handlePMSensor();
     
     data.temp = dhtSensor.getTemperature();
     data.hum = dhtSensor.getHumidity();
     
-    updateUI();
-    handleBlynkTransmission(); // Blynk logic remains untouched
+    if (!data.isMuted) {
+        updateUI();
+        led.updateLED(data.pm2_5);
+    }
     
-    led.updateLED(data.pm2_5);
-
+    handleBlynkTransmission(); // Blynk logic remains untouched
     delay(20); 
 }
 
@@ -109,6 +131,7 @@ void cycleSystemMode() {
         Serial.println(F(">> MODE: ACTIVE (Always On)"));
     }
     
+    saveSettings();
     stateTimer = millis();
     isDataFresh = false;
 }
@@ -170,5 +193,39 @@ void handleBlynkTransmission() {
         lastBlynk = now;
         blynkFlashTimer = now; 
         isDataFresh = false; 
+    }
+}
+
+void saveSettings() {
+    EEPROM.put(ADDR_MODE, (int)data.currentMode);
+    EEPROM.put(ADDR_MUTED, (int)data.isMuted);
+    EEPROM.commit();
+    Serial.println(F(">> Settings Saved to EEPROM."));
+}
+
+void loadSettings() {
+    int storedMode;
+    int storedMuted;
+    EEPROM.get(ADDR_MODE, storedMode);
+    EEPROM.get(ADDR_MUTED, storedMuted);
+
+    // Validate stored mode (0: ACTIVE, 1: PASSIVE)
+    if (storedMode >= 0 && storedMode <= 1) {
+        data.currentMode = (SystemMode)storedMode;
+        Serial.print(F(">> Loaded Mode: "));
+        Serial.println(storedMode == MODE_ACTIVE ? "ACTIVE" : "PASSIVE");
+    } else {
+        data.currentMode = (SystemMode)DEFAULT_MODE_SETTING;
+        Serial.println(F(">> EEPROM Mode Empty/Corrupt. Using Default."));
+    }
+
+    // Validate stored muted state
+    if (storedMuted == 0 || storedMuted == 1) {
+        data.isMuted = (bool)storedMuted;
+        Serial.print(F(">> Loaded Stealth: "));
+        Serial.println(data.isMuted ? "ON" : "OFF");
+    } else {
+        data.isMuted = false;
+        Serial.println(F(">> EEPROM Muted Empty/Corrupt. Defaulting OFF."));
     }
 }
