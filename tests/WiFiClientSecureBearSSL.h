@@ -6,6 +6,7 @@ class WiFiClientSecure : public WiFiClient {
 public:
     void setInsecure() {}
     void setBufferSizes(uint16_t rx, uint16_t tx) {}
+    void setTimeout(unsigned long timeout) {}
 };
 }
 #endif

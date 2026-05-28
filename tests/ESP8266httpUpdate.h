@@ -7,7 +7,9 @@ enum t_httpUpdate_return { HTTP_UPDATE_FAILED, HTTP_UPDATE_NO_UPDATES, HTTP_UPDA
 class ESP8266HTTPUpdate {
 public:
     t_httpUpdate_return update(class WiFiClient& client, const char* url) { return HTTP_UPDATE_NO_UPDATES; }
+    t_httpUpdate_return update(const String& url, const String& currentVersion = "") { return HTTP_UPDATE_NO_UPDATES; }
     void setFollowRedirects(followRedirects_t follow) {}
+    void setInsecure() {}
     int getLastError() { return 0; }
     String getLastErrorString() { return ""; }
 };

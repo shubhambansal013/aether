@@ -5,9 +5,19 @@
 #include <string.h>
 #include <iostream>
 #include <string>
+#include <stdarg.h>
+#include <stdio.h>
 
 typedef uint8_t byte;
-typedef std::string String;
+class String : public std::string {
+public:
+    String() : std::string() {}
+    String(const char* s) : std::string(s) {}
+    String(const std::string& s) : std::string(s) {}
+    void trim() {}
+    const char* c_str() const { return std::string::c_str(); }
+    size_t length() const { return std::string::length(); }
+};
 
 class WiFiClient {};
 
@@ -28,10 +38,18 @@ class SerialMock {
 public:
     void begin(long baud) {}
     void print(const char* s) { std::cout << s; }
-    void print(String s) { std::cout << s; }
+    void print(String s) { std::cout << (std::string)s; }
+    void print(uint32_t n) { std::cout << n; }
     void println(const char* s) { std::cout << s << std::endl; }
-    void println(String s) { std::cout << s << std::endl; }
-    void printf(const char* format, ...) {}
+    void println(String s) { std::cout << (std::string)s << std::endl; }
+    void println(uint32_t n) { std::cout << n << std::endl; }
+    void printf(const char* format, ...) {
+        va_list args;
+        va_start(args, format);
+        vprintf(format, args);
+        va_end(args);
+        std::cout << std::endl;
+    }
 };
 
 extern SerialMock Serial;
@@ -42,5 +60,11 @@ public:
 };
 
 extern WiFiMock WiFi;
+
+class ESPMock {
+public:
+    uint32_t getFreeHeap() { return 40000; }
+};
+extern ESPMock ESP;
 
 #endif

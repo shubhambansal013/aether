@@ -88,19 +88,23 @@ void OTAHandler::checkForUpdates() {
 }
 
 void OTAHandler::performUpdate(const char* firmwareUrl) {
+    String url = String(firmwareUrl);
+    url.trim();
+
     Serial.print(F("Starting OTA update from: "));
-    Serial.println(firmwareUrl);
+    Serial.println(url);
+    Serial.print(F("Free heap: "));
+    Serial.println(ESP.getFreeHeap());
 
     if (_oled) _oled->printMessage("Updating...", "Downloading binary");
     if (_led) _led->setColor(0x0000FF); // Blue for update
 
-    std::unique_ptr<BearSSL::WiFiClientSecure> client(new BearSSL::WiFiClientSecure);
-    client->setInsecure();
-    client->setBufferSizes(1024, 1024);
-
-    // The update process is blocking and will reboot on success
+    // Let ESPhttpUpdate handle the internal WiFiClientSecure instance
+    // This often works more reliably for redirects on ESP8266
+    ESPhttpUpdate.setInsecure();
     ESPhttpUpdate.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-    t_httpUpdate_return ret = ESPhttpUpdate.update(*client, firmwareUrl);
+
+    t_httpUpdate_return ret = ESPhttpUpdate.update(url);
 
     switch (ret) {
         case HTTP_UPDATE_FAILED:
