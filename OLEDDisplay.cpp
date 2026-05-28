@@ -1,4 +1,5 @@
 #include "OLEDDisplay.h"
+#include "Config.h"
 #include "DHTSensor.h" 
 #include <Wire.h>
 
