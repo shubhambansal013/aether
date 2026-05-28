@@ -7,10 +7,23 @@
 #include <ArduinoJson.h>
 #include <memory>
 
-OTAHandler::OTAHandler() : _lastCheck(0) {}
+OTAHandler::OTAHandler() : _lastCheck(0), _oled(nullptr), _led(nullptr) {}
+
+void OTAHandler::setup(OLEDDisplay* oled, RGBLEDHandler* led) {
+    _oled = oled;
+    _led = led;
+}
 
 void OTAHandler::handle() {
-    if (WiFi.status() != WL_CONNECTED) return;
+    if (WiFi.status() != WL_CONNECTED) {
+        // Log periodically even if not connected to show it's alive
+        static unsigned long lastWiFiLog = 0;
+        if (millis() - lastWiFiLog > 30000) {
+            Serial.println(F("OTA: WiFi not connected, skipping check."));
+            lastWiFiLog = millis();
+        }
+        return;
+    }
 
     unsigned long now = millis();
     if (_lastCheck == 0 || (now - _lastCheck >= OTA_CHECK_INTERVAL)) {
@@ -65,7 +78,11 @@ void OTAHandler::checkForUpdates() {
 }
 
 void OTAHandler::performUpdate(const char* firmwareUrl) {
-    Serial.println(F("Starting OTA update..."));
+    Serial.print(F("Starting OTA update from: "));
+    Serial.println(firmwareUrl);
+
+    if (_oled) _oled->printMessage("Updating...", "Downloading binary");
+    if (_led) _led->setColor(0x0000FF); // Blue for update
 
     std::unique_ptr<BearSSL::WiFiClientSecure> client(new BearSSL::WiFiClientSecure);
     client->setInsecure();
@@ -81,7 +98,8 @@ void OTAHandler::performUpdate(const char* firmwareUrl) {
             Serial.println(F("No updates available."));
             break;
         case HTTP_UPDATE_OK:
-            Serial.println(F("OTA update successful!"));
+            Serial.println(F("OTA update successful! Rebooting..."));
+            if (_oled) _oled->printMessage("Update OK", "Rebooting...");
             break;
     }
 }

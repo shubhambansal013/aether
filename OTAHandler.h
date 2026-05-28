@@ -2,6 +2,8 @@
 #define OTA_HANDLER_H
 
 #include <Arduino.h>
+#include "OLEDDisplay.h"
+#include "RGBLEDHandler.h"
 
 /**
  * @brief Handles Over-the-Air (OTA) firmware updates for the ESP8266.
@@ -24,6 +26,14 @@ public:
      */
     void handle();
 
+    /**
+     * @brief Initializes the OTAHandler with OLED and LED pointers.
+     *
+     * @param oled Pointer to the OLEDDisplay instance.
+     * @param led Pointer to the RGBLEDHandler instance.
+     */
+    void setup(OLEDDisplay* oled, RGBLEDHandler* led);
+
 private:
     /**
      * @brief Fetches the version manifest from GitHub and compares it with the current version.
@@ -38,6 +48,8 @@ private:
     void performUpdate(const char* firmwareUrl);
 
     unsigned long _lastCheck = 0; ///< Timestamp of the last update check.
+    OLEDDisplay* _oled = nullptr;
+    RGBLEDHandler* _led = nullptr;
 };
 
 #endif

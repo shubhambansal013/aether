@@ -22,6 +22,7 @@ void SystemController::setup() {
     _pmSensor.begin(9600);
     _dhtSensor.setup();
     _wifi.startConnect();
+    _ota.setup(&_oled, &_led);
 
     _data.isWarmup = false;
     _sensorAwake = true;

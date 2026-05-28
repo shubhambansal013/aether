@@ -23,6 +23,10 @@ void RGBLEDHandler::turnOff() {
     setLEDColor(0);
 }
 
+void RGBLEDHandler::setColor(uint32_t hex) {
+    setLEDColor(hex);
+}
+
 void RGBLEDHandler::startupSequence() {
     setLEDColor(0xFF0000); delay(500); // Red
     setLEDColor(0x00FF00); delay(500); // Green
