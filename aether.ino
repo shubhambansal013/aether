@@ -10,7 +10,6 @@
 #include "ButtonHandler.h"
 #include "blynk_config.h"
 
-// --- Shield for ESP8266 IRAM Errors ---
 #ifndef IRAM_ATTR
   #define IRAM_ATTR __attribute__((section(".text")))
 #endif
@@ -25,7 +24,7 @@ WiFiHandler wifi;
 BlynkHandler blynk;
 ButtonHandler button(BUTTON_PIN);
 
-// --- Timers & Internal State ---
+// --- State Management ---
 unsigned long lastBlynk = 0;
 unsigned long stateTimer = 0;
 unsigned long bootTime = 0;
@@ -33,17 +32,18 @@ unsigned long blynkFlashTimer = 0;
 
 bool sensorAwake = true;
 bool isDataFresh = false;
+bool isMuted = false; 
 
 // --- Function Prototypes ---
 void handlePMSensor();
 void updateUI();
 void handleBlynkTransmission();
 void cycleSystemMode();
+void toggleStealthMode();
 
 void setup() {
     Serial.begin(115200);
     
-    // 1. Initialize Hardware
     button.setup();
     oled.setup();
     led.setup();
@@ -53,62 +53,64 @@ void setup() {
     dhtSensor.setup();
     wifi.startConnect();
 
-    // 2. Initial Mode (Simplified to 2 Phases)
-    // We assume Config.h now only uses MODE_ACTIVE or MODE_PASSIVE
     data.currentMode = (SystemMode)DEFAULT_MODE_SETTING;
     data.isWarmup = false; 
     
-    // Both modes start with sensor awake
     sensorAwake = true;
     pmSensor.wakeup();
     
     bootTime = millis();
     stateTimer = millis();
     
-    Serial.print(F("--- System Initialized. Mode: "));
-    Serial.println(data.currentMode == MODE_ACTIVE ? "ACTIVE" : "PASSIVE");
+    Serial.println(F("--- System Initialized ---"));
 }
 
 void loop() {
     wifi.handleConnect();
     
-    if (button.isPressed()) {
-        cycleSystemMode();
-    }
+    if (button.isPressed()) cycleSystemMode();
+    if (button.isLongPressed()) toggleStealthMode();
     
     handlePMSensor();
     
     data.temp = dhtSensor.getTemperature();
     data.hum = dhtSensor.getHumidity();
     
-    updateUI();
-    handleBlynkTransmission(); // Blynk logic remains untouched
-    
-    led.updateLED(data.pm2_5);
+    if (!isMuted) {
+        updateUI();
+        led.updateLED(data.pm2_5);
+    } else {
+        // Keep both hardware components off
+        oled.clear(); 
+        led.turnOff(); 
+    }
 
+    handleBlynkTransmission();
     delay(20); 
 }
 
-/**
- * @brief Simple 2-mode cycle: ACTIVE <-> PASSIVE
- * Passive starts with Wake (Fan On).
- */
+void toggleStealthMode() {
+    isMuted = !isMuted;
+    if (isMuted) {
+        oled.clear(); 
+        led.turnOff();
+        Serial.println(F(">> STEALTH MODE: ON"));
+    } else {
+        Serial.println(F(">> STEALTH MODE: OFF"));
+    }
+}
+
 void cycleSystemMode() {
     data.isWarmup = false;
-
     if (data.currentMode == MODE_ACTIVE) {
         data.currentMode = MODE_PASSIVE;
-        sensorAwake = true; // Start Passive with fan ON
+        sensorAwake = true;
         pmSensor.wakeup();
-        Serial.println(F(">> MODE: PASSIVE (Starting Cycle)"));
-    } 
-    else {
+    } else {
         data.currentMode = MODE_ACTIVE;
         sensorAwake = true;
         pmSensor.wakeup();
-        Serial.println(F(">> MODE: ACTIVE (Always On)"));
     }
-    
     stateTimer = millis();
     isDataFresh = false;
 }
@@ -117,13 +119,11 @@ void handlePMSensor() {
     unsigned long now = millis();
     unsigned long elapsed = now - stateTimer;
 
-    // 1. MODE: ACTIVE - Stay awake forever
     if (data.currentMode == MODE_ACTIVE) {
         if (pmSensor.readData(data.pm1_0, data.pm2_5, data.pm10_0)) isDataFresh = true;
         return;
     }
 
-    // 2. MODE: PASSIVE - (Wake -> Sleep cycle)
     if (sensorAwake) {
         if (pmSensor.readData(data.pm1_0, data.pm2_5, data.pm10_0)) {
             if (elapsed > STABILITY_THRESHOLD) isDataFresh = true;
@@ -147,7 +147,6 @@ void updateUI() {
     unsigned long now = millis();
     data.wifiStatus = wifi.getWifiStatus();
     data.isSleeping = !sensorAwake;
-
     data.showBlynkIcon = (now - blynkFlashTimer < BLYNK_ICON_KEEP_ALIVE);
 
     unsigned long elapsed = now - stateTimer;
@@ -157,14 +156,11 @@ void updateUI() {
         unsigned long limit = sensorAwake ? PM_WAKE_DURATION : PM_SLEEP_DURATION;
         data.countdown = (limit - elapsed) / 1000;
     }
-    
-    if (data.countdown < 0) data.countdown = 0;
     oled.update(data);
 }
 
 void handleBlynkTransmission() {
     unsigned long now = millis();
-    // Logic exactly as before
     if ((WiFi.status() == WL_CONNECTED) && isDataFresh && (now - lastBlynk > BLYNK_SEND_INTERVAL)) {
         blynk.sendData(BLYNK_AUTH_TOKEN, data.pm1_0, data.pm2_5, data.pm10_0, data.temp, data.hum);
         lastBlynk = now;
