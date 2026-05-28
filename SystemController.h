@@ -113,6 +113,8 @@ private:
     OTAHandler _ota;
 
     unsigned long _lastBlynk = 0;
+    unsigned long _lastDHTRead = 0;
+    const unsigned long DHT_READ_INTERVAL = 2000;
     unsigned long _stateTimer = 0;
     unsigned long _blynkFlashTimer = 0;
     bool _sensorAwake = true;
