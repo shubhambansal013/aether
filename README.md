@@ -19,7 +19,7 @@ This project is designed for an ESP8266 NodeMCU board.
 
 ### DHT22 Temperature & Humidity Sensor
 
-*   **Data Pin:** D4 (GPIO2)
+*   **Data Pin:** D3 (GPIO0)
 
 ### OLED I2C Display (SSD1306 128x64)
 
@@ -51,7 +51,7 @@ A 4-pin common cathode RGB LED is used for a rough visual indicator of device st
 
 ### Other
 
-*   **Onboard LED:** D4 (GPIO2) - *This pin is still used by the DHT22 sensor; its original purpose as a general status LED has been replaced by the RGB LED. No changes are needed here, but be aware of its dual role if troubleshooting.*
+*   **Onboard LEDs:** D4 (GPIO2) and D0 (GPIO16). Both are explicitly disabled (set HIGH) in `SystemController::setup()` to prevent flickering. D4 was previously used for the DHT22 sensor but has been moved to D3 to ensure no hardware-level interference with the LED.
 
 ## Libraries Used
 

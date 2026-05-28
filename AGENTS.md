@@ -14,9 +14,10 @@ The project follows an object-oriented design:
 ## Pin Configuration (NodeMCU)
 - PM Sensor: RX=14 (D5), SET=12 (D6)
 - OLED Display: SDA=4 (D2), SCL=5 (D1)
-- DHT22 Sensor: 2 (D4)
+- DHT22 Sensor: 0 (D3)
 - WS2812 LED: 15 (D8)
 - Button: 13 (D7)
+- Onboard LEDs: 2 (D4) and 16 (D0) [Disabled]
 
 ## Operating Modes
 - **ACTIVE**: Continuous PM sensor readings.

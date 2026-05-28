@@ -9,6 +9,12 @@ SystemController::SystemController(PMSensor& pm, DHTSensor& dht, OLEDDisplay& ol
       _wifi(wifi), _blynk(blynk), _button(button) {}
 
 void SystemController::setup() {
+    // Explicitly disable onboard NodeMCU LEDs (active-low)
+    pinMode(ONBOARD_LED_PIN, OUTPUT);
+    digitalWrite(ONBOARD_LED_PIN, HIGH);
+    pinMode(INTERNAL_LED_ALT_PIN, OUTPUT);
+    digitalWrite(INTERNAL_LED_ALT_PIN, HIGH);
+
     _button.setup();
     _oled.setup();
     _led.setup();
@@ -46,8 +52,13 @@ void SystemController::processInputs() {
 
 void SystemController::updateSensors() {
     handlePMSensor();
-    _data.temp = _dhtSensor.getTemperature();
-    _data.hum = _dhtSensor.getHumidity();
+
+    unsigned long now = millis();
+    if (now - _lastDHTRead >= DHT_READ_INTERVAL) {
+        _data.temp = _dhtSensor.getTemperature();
+        _data.hum = _dhtSensor.getHumidity();
+        _lastDHTRead = now;
+    }
 }
 
 void SystemController::updateOutputs() {
