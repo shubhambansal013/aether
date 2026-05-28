@@ -15,6 +15,7 @@ public:
 private:
     Adafruit_NeoPixel _strip;
     void setLEDColor(uint32_t hex);
+    uint32_t getColorForConcentration(float pm2_5);
     
     static const uint32_t C_GREEN  = 0x00FF00;
     static const uint32_t C_YELLOW = 0xFFFF00;

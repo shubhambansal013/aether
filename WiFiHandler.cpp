@@ -83,8 +83,7 @@ void WiFiHandler::startConnect() {
  * @return true if Wi-Fi is successfully connected (WL_CONNECTED in WIFI_STA mode), false otherwise.
  */
 bool WiFiHandler::handleConnect() {
-    // 1. Connection Success Check (Exit Condition)
-    if (WiFi.status() == WL_CONNECTED && WiFi.getMode() == WIFI_STA) {
+    if (isStationConnected()) {
         if (_connectMode != IDLE) {
             Serial.println("\n--- SUCCESS! Wi-Fi Connected. ---");
             _connectMode = IDLE; 
@@ -92,7 +91,10 @@ bool WiFiHandler::handleConnect() {
         return true;
     }
 
-    // 2. Mode Handling
+    return handleConnectionModes();
+}
+
+bool WiFiHandler::handleConnectionModes() {
     switch (_connectMode) {
         case STA_CONNECTING:
             // Saved config exists. Waiting for ESP core to connect indefinitely.
@@ -113,7 +115,7 @@ bool WiFiHandler::handleConnect() {
 // --- Status and Utility Methods ---
 
 String WiFiHandler::getWifiStatus() {
-    if (WiFi.status() == WL_CONNECTED && WiFi.getMode() == WIFI_STA) {
+    if (isStationConnected()) {
         return "Connected";
     }
 
@@ -144,4 +146,8 @@ void WiFiHandler::configModeCallback (WiFiManager *myWiFiManager) {
     Serial.println("Entered Configuration Mode.");
     Serial.print("Connect to AP 'airmon_AP' at IP: ");
     Serial.println(WiFi.softAPIP());
+}
+
+bool WiFiHandler::isStationConnected() {
+    return WiFi.status() == WL_CONNECTED && WiFi.getMode() == WIFI_STA;
 }

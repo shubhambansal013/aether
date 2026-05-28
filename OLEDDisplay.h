@@ -25,6 +25,7 @@ private:
 
     // --- Refactored Private Drawing Methods ---
     void drawStatusBar(const SystemData& data);
+    void drawStatusBarText(const SystemData& data);
     void drawHeroSection(float pm2_5);
     void drawSecondaryGrid(const SystemData& data);
     
