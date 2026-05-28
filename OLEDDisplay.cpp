@@ -30,27 +30,29 @@ void OLEDDisplay::update(const SystemData& data) {
 }
 
 void OLEDDisplay::drawStatusBar(const SystemData& data) {
-    // Pass the actual mode to the icon drawer
     drawModeIcon(0, 0, data);
     drawFanIcon(15, 0, (data.isWarmup || !data.isSleeping));
     
+    drawStatusBarText(data);
+
+    if (data.showBlynkIcon) drawBlynkIndicator();
+    drawWifiIcon(SCREEN_WIDTH - 12, 1, data.wifiStatus);
+
+    display.drawFastHLine(0, 11, SCREEN_WIDTH, SSD1306_WHITE);
+}
+
+void OLEDDisplay::drawStatusBarText(const SystemData& data) {
     display.setTextSize(1);
     display.setCursor(45, 1);
 
     if (data.wifiStatus == "AP Config") {
         display.print("SETUP");
     } 
-    // Only show countdown if NOT in Manual Active mode
     else if (data.currentMode != MODE_ACTIVE) {
         if (data.countdown < 10) display.print(" "); 
         display.print(data.countdown);
         display.print("s");
     }
-
-    if (data.showBlynkIcon) drawBlynkIndicator();
-    drawWifiIcon(SCREEN_WIDTH - 12, 1, data.wifiStatus);
-    
-    display.drawFastHLine(0, 11, SCREEN_WIDTH, SSD1306_WHITE);
 }
 
 void OLEDDisplay::drawHeroSection(float pm2_5) {

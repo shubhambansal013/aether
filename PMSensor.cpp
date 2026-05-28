@@ -21,22 +21,11 @@ void PMSensor::clearBuffer() {
  * @brief Public method to handle the full reading cycle.
  */
 bool PMSensor::readData(float& pm1_0, float& pm2_5, float& pm10_0) {
-    // 1. Ensure enough data is present for a full 32-byte packet
     if (_pmSerial.available() < 32) return false;
     
     byte buffer[32];
+    if (!readPacket(buffer)) return false;
     
-    // 2. Sync with the start bytes (0x42 0x4D)
-    if (!findHeader()) return false;
-    
-    // 3. Populate buffer with the header we just verified
-    buffer[0] = 0x42;
-    buffer[1] = 0x4D;
-    
-    // 4. Read the remaining 30 bytes of the packet
-    _pmSerial.readBytes(&buffer[2], 30);
-    
-    // 5. Verify data integrity via Checksum
     if (!isValidChecksum(buffer, 32)) {
         Serial.println(">> PMS ERROR: Checksum Mismatch. Discarding packet.");
         return false;
@@ -79,6 +68,15 @@ bool PMSensor::isValidChecksum(byte* buffer, int length) {
     
     uint16_t sentChecksum = (buffer[30] << 8) | buffer[31];
     return (calculatedSum == sentChecksum);
+}
+
+bool PMSensor::readPacket(byte* buffer) {
+    if (!findHeader()) return false;
+
+    buffer[0] = 0x42;
+    buffer[1] = 0x4D;
+    _pmSerial.readBytes(&buffer[2], 30);
+    return true;
 }
 
 /**

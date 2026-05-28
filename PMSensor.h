@@ -59,6 +59,12 @@ private:
      * @brief Extracts specific PM values from the validated buffer.
      */
     void parseBuffer(byte* buffer, float& pm1_0, float& pm2_5, float& pm10_0);
+
+    /**
+     * @brief Syncs with header and reads the full 32-byte packet.
+     * @return true if packet was successfully read.
+     */
+    bool readPacket(byte* buffer);
 };
 
 #endif

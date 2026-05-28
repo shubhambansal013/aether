@@ -32,15 +32,23 @@ void SystemController::setup() {
 
 void SystemController::update() {
     _wifi.handleConnect();
+    processInputs();
+    updateSensors();
+    updateOutputs();
+}
 
+void SystemController::processInputs() {
     if (_button.isPressed()) cycleSystemMode();
     if (_button.isLongPressed()) toggleStealthMode();
+}
 
+void SystemController::updateSensors() {
     handlePMSensor();
-
     _data.temp = _dhtSensor.getTemperature();
     _data.hum = _dhtSensor.getHumidity();
+}
 
+void SystemController::updateOutputs() {
     if (!_isMuted) {
         updateUI();
         _led.updateLED(_data.pm2_5);
@@ -48,7 +56,6 @@ void SystemController::update() {
         _oled.clear();
         _led.turnOff();
     }
-
     handleBlynkTransmission();
 }
 
@@ -88,10 +95,19 @@ void SystemController::handlePMSensor() {
     unsigned long elapsed = now - _stateTimer;
 
     if (_data.currentMode == MODE_ACTIVE) {
-        if (_pmSensor.readData(_data.pm1_0, _data.pm2_5, _data.pm10_0)) _isDataFresh = true;
-        return;
+        handleActiveMode();
+    } else {
+        handlePassiveMode(now, elapsed);
     }
+}
 
+void SystemController::handleActiveMode() {
+    if (_pmSensor.readData(_data.pm1_0, _data.pm2_5, _data.pm10_0)) {
+        _isDataFresh = true;
+    }
+}
+
+void SystemController::handlePassiveMode(unsigned long now, unsigned long elapsed) {
     if (_sensorAwake) {
         if (_pmSensor.readData(_data.pm1_0, _data.pm2_5, _data.pm10_0)) {
             if (elapsed > STABILITY_THRESHOLD) _isDataFresh = true;

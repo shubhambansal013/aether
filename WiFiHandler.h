@@ -46,6 +46,8 @@ private:
     void setupWiFiManager();
     void startConfigAP();
     void startSTAConnect();
+    bool isStationConnected();
+    bool handleConnectionModes();
     // Removed processAPTimeout() as AP mode is now indefinite when no config is present.
 
     // --- Static Callbacks ---

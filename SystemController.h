@@ -24,15 +24,69 @@ public:
     void toggleStealthMode();
     void cycleSystemMode();
 
-    // Getters for testing/UI
+    /**
+     * @brief Returns the current system data.
+     * @return Const reference to SystemData.
+     */
     const SystemData& getData() const { return _data; }
+
+    /**
+     * @brief Checks if the system is in Stealth Mode (Muted).
+     * @return true if muted, false otherwise.
+     */
     bool isMuted() const { return _isMuted; }
 
 private:
+    /**
+     * @brief Processes user inputs (buttons).
+     */
+    void processInputs();
+
+    /**
+     * @brief Updates sensor data (PMS, DHT).
+     */
+    void updateSensors();
+
+    /**
+     * @brief Manages output components (OLED, LED, Blynk).
+     */
+    void updateOutputs();
+
+    /**
+     * @brief Manages the PM sensor state and reading.
+     */
     void handlePMSensor();
+
+    /**
+     * @brief Logic for PM sensor in ACTIVE mode.
+     */
+    void handleActiveMode();
+
+    /**
+     * @brief Logic for PM sensor in PASSIVE mode (Wake/Sleep cycle).
+     * @param now Current timestamp in millis.
+     * @param elapsed Time elapsed since last state transition.
+     */
+    void handlePassiveMode(unsigned long now, unsigned long elapsed);
+
+    /**
+     * @brief Updates the OLED display data and triggers a refresh.
+     */
     void updateUI();
+
+    /**
+     * @brief Transmits data to Blynk if conditions are met.
+     */
     void handleBlynkTransmission();
+
+    /**
+     * @brief Loads system settings from EEPROM.
+     */
     void loadSettings();
+
+    /**
+     * @brief Saves system settings to EEPROM.
+     */
     void saveSettings();
 
     SystemData _data;

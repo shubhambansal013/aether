@@ -31,18 +31,18 @@ void RGBLEDHandler::startupSequence() {
 }
 
 void RGBLEDHandler::updateLED(float pm2_5) {
-    if (pm2_5 < 0) { 
-        setLEDColor(C_BLUE); // Stay blue if no sensor data received yet
-        return; 
-    }
-    
-    uint32_t color;
-    if (pm2_5 <= 30)       color = C_GREEN;
-    else if (pm2_5 <= 60)  color = C_YELLOW;
-    else if (pm2_5 <= 90)  color = C_ORANGE;
-    else if (pm2_5 <= 120) color = C_PINK;
-    else if (pm2_5 <= 250) color = C_PURPLE;
-    else                   color = C_RED;
-    
+    uint32_t color = getColorForConcentration(pm2_5);
     setLEDColor(color);
+}
+
+uint32_t RGBLEDHandler::getColorForConcentration(float pm2_5) {
+    if (pm2_5 < 0) return C_BLUE;
+    
+    if (pm2_5 <= 30)       return C_GREEN;
+    if (pm2_5 <= 60)       return C_YELLOW;
+    if (pm2_5 <= 90)       return C_ORANGE;
+    if (pm2_5 <= 120)      return C_PINK;
+    if (pm2_5 <= 250)      return C_PURPLE;
+    
+    return C_RED;
 }
