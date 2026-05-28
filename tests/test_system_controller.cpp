@@ -13,6 +13,7 @@ void digitalWrite(int pin, int val) {}
 SerialMock Serial;
 WiFiMock WiFi;
 EEPROMMock EEPROM;
+ESPMock ESP;
 ESP8266HTTPUpdate ESPhttpUpdate;
 
 #include "../SystemController.h"

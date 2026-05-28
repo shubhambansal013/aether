@@ -15,5 +15,9 @@ public:
     String getString() { return ""; }
     void end() {}
     String errorToString(int code) { return ""; }
+    void collectHeaders(const char* headerKeys[], const size_t headerKeysCount) {}
+    bool hasHeader(const char* name) { return false; }
+    String header(const char* name) { return ""; }
+    void setUserAgent(const char* ua) {}
 };
 #endif
