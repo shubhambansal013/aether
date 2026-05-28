@@ -16,6 +16,10 @@ static const int BUTTON_PIN        = 13; // D7 (GPIO 13)
 static const int DEFAULT_MODE_SETTING = 1;
 static const uint8_t DEFAULT_OLED_BRIGHTNESS = 150;
 
+// --- EEPROM Addresses ---
+static const int ADDR_MODE  = 10;
+static const int ADDR_MUTED = 14;
+
 // --- Timing Constants (in Milliseconds) ---
 static const unsigned long INITIAL_WARMUP_DURATION = 300000; 
 static const unsigned long PM_WAKE_DURATION        = 32000;  

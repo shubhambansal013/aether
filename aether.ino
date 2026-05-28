@@ -9,6 +9,7 @@
 #include "BlynkHandler.h"
 #include "ButtonHandler.h"
 #include "blynk_config.h"
+#include <EEPROM.h>
 
 #ifndef IRAM_ATTR
   #define IRAM_ATTR __attribute__((section(".text")))
@@ -43,17 +44,39 @@ void toggleStealthMode();
 
 void setup() {
     Serial.begin(115200);
+
+    // Initialize EEPROM for state persistence
+    EEPROM.begin(512);
     
     button.setup();
     oled.setup();
     led.setup();
-    led.startupSequence();
+
+    // Load persisted settings
+    byte savedMode;
+    EEPROM.get(ADDR_MODE, savedMode);
+    if (savedMode == 0 || savedMode == 1) {
+        data.currentMode = (SystemMode)savedMode;
+    } else {
+        data.currentMode = (SystemMode)DEFAULT_MODE_SETTING;
+    }
+
+    byte savedMuted;
+    EEPROM.get(ADDR_MUTED, savedMuted);
+    if (savedMuted == 255) { // Uninitialized
+        isMuted = false;
+    } else {
+        isMuted = (bool)savedMuted;
+    }
+
+    if (!isMuted) {
+        led.startupSequence();
+    }
     
     pmSensor.begin(9600);
     dhtSensor.setup();
     wifi.startConnect();
 
-    data.currentMode = (SystemMode)DEFAULT_MODE_SETTING;
     data.isWarmup = false; 
     
     sensorAwake = true;
@@ -91,12 +114,17 @@ void loop() {
 
 void toggleStealthMode() {
     isMuted = !isMuted;
+
+    // Persist new state
+    EEPROM.put(ADDR_MUTED, (byte)isMuted);
+    EEPROM.commit();
+
     if (isMuted) {
         oled.clear(); 
         led.turnOff();
-        Serial.println(F(">> STEALTH MODE: ON"));
+        Serial.println(F(">> STEALTH MODE: ON (SAVED)"));
     } else {
-        Serial.println(F(">> STEALTH MODE: OFF"));
+        Serial.println(F(">> STEALTH MODE: OFF (SAVED)"));
     }
 }
 
@@ -104,15 +132,20 @@ void cycleSystemMode() {
     data.isWarmup = false;
     if (data.currentMode == MODE_ACTIVE) {
         data.currentMode = MODE_PASSIVE;
-        sensorAwake = true;
-        pmSensor.wakeup();
     } else {
         data.currentMode = MODE_ACTIVE;
-        sensorAwake = true;
-        pmSensor.wakeup();
     }
+
+    // Persist new mode
+    EEPROM.put(ADDR_MODE, (byte)data.currentMode);
+    EEPROM.commit();
+
+    sensorAwake = true;
+    pmSensor.wakeup();
     stateTimer = millis();
     isDataFresh = false;
+    Serial.print(F(">> MODE CHANGED & SAVED: "));
+    Serial.println(data.currentMode == MODE_ACTIVE ? "ACTIVE" : "PASSIVE");
 }
 
 void handlePMSensor() {
