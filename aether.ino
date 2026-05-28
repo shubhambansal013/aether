@@ -9,7 +9,6 @@
 #include "RGBLEDHandler.h"
 #include "BlynkHandler.h"
 #include "ButtonHandler.h"
-#include "ResetHandler.h"
 #include "blynk_config.h"
 
 // --- Shield for ESP8266 IRAM Errors ---
@@ -26,7 +25,6 @@ RGBLEDHandler led(WS2812_PIN);
 WiFiHandler wifi;
 BlynkHandler blynk;
 ButtonHandler button(BUTTON_PIN);
-ResetHandler resetHandler(wifi);
 const int ADDR_MODE  = 10;
 const int ADDR_MUTED = 14;
 
@@ -56,7 +54,6 @@ void setup() {
     oled.setup();
     led.setup();
 
-    resetHandler.checkPowerCycles();
     loadSettings();
 
     if (!data.isMuted) {
