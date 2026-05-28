@@ -89,6 +89,7 @@ void OTAHandler::performUpdate(const char* firmwareUrl) {
     client->setInsecure();
 
     // The update process is blocking and will reboot on success
+    ESPhttpUpdate.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
     t_httpUpdate_return ret = ESPhttpUpdate.update(*client, firmwareUrl);
 
     switch (ret) {
