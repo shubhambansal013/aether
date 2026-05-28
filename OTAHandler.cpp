@@ -40,6 +40,7 @@ void OTAHandler::checkForUpdates() {
 
     HTTPClient https;
     if (https.begin(*client, OTA_MANIFEST_URL)) {
+        https.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
         int httpCode = https.GET();
         if (httpCode == HTTP_CODE_OK) {
             String payload = https.getString();
