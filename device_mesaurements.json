@@ -68,7 +68,7 @@
     "body_width_mm": 15.2,
     "body_height_mm": 20.2,
     "body_depth_mm": 6.25,
-    "vent_face": "note which face has the mesh/holes"
+    "vent_face": "front"
   },
 
   "case_preferences": {
