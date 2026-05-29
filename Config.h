@@ -33,7 +33,7 @@ static const unsigned long DEBOUNCE_DELAY          = 50;
 static const unsigned long BUTTON_LONG_PRESS_TIME  = 2000; 
 
 // --- OTA Settings ---
-static const unsigned long OTA_CHECK_INTERVAL = 60000; // 1 min for testing — change to 3600000 (1hr) before production
+static const unsigned long OTA_CHECK_INTERVAL = 600000; // 10 mins
 static const char* OTA_MANIFEST_URL = "https://shubhambansal013.github.io/aether/version.json";
 
 // --- Meta ---
