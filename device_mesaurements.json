@@ -15,9 +15,9 @@
     "module_width_mm": 26.6,
     "gap_from_left_pcb_edge_mm": 4.7,
     "gap_from_top_pcb_edge_mm": 8,
-    "glass_width_mm": 25,
-    "glass_height_mm": 16.7,
-    "gap_from_left_module_edge_to_glass_mm": 0,
+    "glass_width_mm": 21.74,
+    "glass_height_mm": 10.86,
+    "gap_from_left_module_edge_to_glass_mm": 1.7, // (25.2 - 21.74) / 2)
     "gap_from_top_module_edge_to_glass_mm": 4.25,
     "total_height_pcb_to_glass_front_mm": 14.6
   },
@@ -27,7 +27,9 @@
     "board_width_mm": 12.25,
     "gap_from_left_pcb_edge_mm": 13.65,
     "gap_from_top_pcb_edge_mm": 15.8,
-    "total_height_pcb_to_led_top_mm": 14.8
+    "total_height_pcb_to_led_top_mm": 14.8,
+    "led_dome_from_left_board_edge_mm": 7.5,
+    "led_dome_from_top_board_edge_mm": 14.8
   },
 
   "top_edge": {
@@ -72,7 +74,7 @@
   "case_preferences": {
     "wall_thickness_mm": 2,
     "tolerance_mm": 0.3,
-    "dome_diameter_mm": -1, // You suggest
+    "dome_diameter_mm": 12,
     "dome_color": "white",
     "body_color": "brown",
     "lid_style": "snap-fit",
