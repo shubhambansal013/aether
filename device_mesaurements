@@ -1,0 +1,81 @@
+{
+  "pcb": {
+    "length_mm": 70.04,
+    "width_mm": 45.3,
+    "thickness_mm": 1.6
+  },
+
+  "nodemcu_side": {
+    "header_height_mm": 11,
+    "total_height_above_pcb_mm": 14
+  },
+
+  "oled": {
+    "module_length_mm": 25.2,
+    "module_width_mm": 26.6,
+    "gap_from_left_pcb_edge_mm": 4.7,
+    "gap_from_top_pcb_edge_mm": 8,
+    "glass_width_mm": 25,
+    "glass_height_mm": 16.7,
+    "gap_from_left_module_edge_to_glass_mm": 0,
+    "gap_from_top_module_edge_to_glass_mm": 4.25,
+    "total_height_pcb_to_glass_front_mm": 14.6
+  },
+
+  "ws2812_breakout": {
+    "board_length_mm": 17.6,
+    "board_width_mm": 12.25,
+    "gap_from_left_pcb_edge_mm": 13.65,
+    "gap_from_top_pcb_edge_mm": 15.8,
+    "total_height_pcb_to_led_top_mm": 14.8
+  },
+
+  "top_edge": {
+    "jst_pms_center_from_left_mm": 13.3,
+    "jst_pms_height_above_pcb_mm": 7.6,
+    "jst_dht22_center_from_left_mm": 34.35,
+    "jst_dht22_height_above_pcb_mm": 6.85,
+    "button_center_from_left_mm": 20.75,
+    "button_protrusion_beyond_pcb_edge_mm": 2.4,
+    "button_stem_diameter_mm": 3.5
+  },
+
+  "right_edge": {
+    "usb_center_from_top_mm": 24.45,
+    "usb_shell_width_mm": 7.75,
+    "usb_shell_height_mm": 2.65,
+    "usb_protrusion_beyond_pcb_edge_mm": 1.3
+  },
+
+  "pms7003": {
+    "body_length_mm": 47,
+    "body_width_mm": 37,
+    "body_height_mm": 12.2,
+    "inlet_diameter_mm": 19.7,
+    "inlet_center_from_corner_x_mm": 12.2,
+    "inlet_center_from_corner_y_mm": 12.2,
+    "exhaust_width_mm": 11.2,
+    "exhaust_height_mm": 8.4,
+    "exhaust_from_corner_x_mm": 11.6,
+    "exhaust_from_corner_y_mm": 10.8,
+    "jst_face": "right",
+    "jst_center_from_corner_mm": 11.65
+  },
+
+  "dht22": {
+    "body_width_mm": 15.2,
+    "body_height_mm": 20.2,
+    "body_depth_mm": 6.25,
+    "vent_face": "note which face has the mesh/holes"
+  },
+
+  "case_preferences": {
+    "wall_thickness_mm": 2,
+    "tolerance_mm": 0.3,
+    "dome_diameter_mm": -1, // You suggest
+    "dome_color": "white",
+    "body_color": "brown",
+    "lid_style": "snap-fit",
+    "orientation": "desk-standing", // Sitting on the lenghty bottom opposite to button side
+  }
+}
